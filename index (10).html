@@ -1,0 +1,2685 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F2B417">
+<title>ТАБЛО — результаты и расписание: футбол, UFC, Формула-1</title>
+<meta name="description" content="Результаты матчей и расписание: Лига чемпионов, АПЛ, Ла Лига, Серия А, Бундеслига, Лига 1, UFC и Формула-1.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ТАБЛО — дизайн-токены
+   Направление: программка матчевого дня — тёплая белая бумага
+   с золотым тиснением. Результат «отчеканен» в золоте,
+   ещё не сыгранный матч — только контур.
+   ============================================================ */
+:root{
+  --paper:      #FFFFFF;   /* карточки */
+  --sand:       #FAF6EC;   /* бумага фона */
+  --ink:        #191510;   /* текст, тёплый почти-чёрный */
+  --muted:      #6E6552;   /* второстепенный текст */
+  --gold:       #F2B417;   /* заливки, активные состояния */
+  --gold-deep:  #9A6B04;   /* золото для текста по белому */
+  --gold-soft:  #FDF0CC;   /* подложки */
+  --gold-edge:  #D99A08;   /* кромка тиснения */
+  --live:       #D6280F;   /* идёт прямо сейчас */
+  --line:       rgba(25,21,16,.10);
+  --line-2:     rgba(25,21,16,.20);
+  --shadow:     0 1px 2px rgba(93,66,8,.07), 0 6px 18px -10px rgba(93,66,8,.22);
+  --shadow-up:  0 2px 4px rgba(93,66,8,.09), 0 14px 28px -14px rgba(93,66,8,.30);
+
+  --r-sm: 6px;
+  --r:    12px;
+  --r-lg: 18px;
+
+  --pad: clamp(14px, 3vw, 28px);
+
+  --font-display: 'Unbounded', 'Trebuchet MS', system-ui, sans-serif;
+  --font-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-data: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+html{scroll-behavior:smooth}
+
+body{
+  background:
+    radial-gradient(980px 460px at 50% -14%, rgba(242,180,23,.30), transparent 66%),
+    var(--sand);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit;color:inherit}
+button{background:none;border:none;cursor:pointer}
+
+:focus-visible{
+  outline:2px solid var(--gold-deep);
+  outline-offset:2px;
+  border-radius:var(--r-sm);
+}
+
+.wrap{max-width:980px;margin:0 auto;padding:0 var(--pad)}
+
+/* ============================================================
+   Шапка
+   ============================================================ */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(255,255,255,.88);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+}
+.topbar-inner{
+  display:flex;align-items:center;gap:clamp(12px,3vw,32px);
+  height:64px;
+}
+.brand{
+  display:flex;align-items:center;gap:9px;
+  font-family:var(--font-display);font-weight:800;
+  font-size:17px;letter-spacing:.06em;
+  white-space:nowrap;
+}
+/* медаль */
+.brand-lamp{
+  width:13px;height:13px;border-radius:50%;
+  background:linear-gradient(150deg,#FFDD6E,var(--gold) 50%,var(--gold-edge));
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.75), 0 1px 3px rgba(154,107,4,.4);
+  flex:none;
+}
+
+.sportnav{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.sportnav::-webkit-scrollbar{display:none}
+.sportnav button{
+  position:relative;
+  padding:8px 14px;
+  font-weight:600;font-size:14px;
+  color:var(--muted);
+  border-radius:var(--r-sm);
+  white-space:nowrap;
+  transition:color .18s ease;
+}
+.sportnav button:hover{color:var(--ink)}
+.sportnav button[aria-selected="true"]{color:var(--ink)}
+.sportnav button[aria-selected="true"]::after{
+  content:'';position:absolute;left:12px;right:12px;bottom:-1px;
+  height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--gold),var(--gold-edge));
+}
+
+.icon-btn{
+  flex:none;width:36px;height:36px;
+  display:grid;place-items:center;
+  background:var(--paper);
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--muted);
+  transition:color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.icon-btn:hover{color:var(--gold-deep);border-color:var(--gold);box-shadow:var(--shadow)}
+.icon-btn.is-busy svg{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+
+/* переключатель языка */
+.langsw{
+  display:flex;flex:none;gap:2px;
+  background:var(--paper);
+  border:1px solid var(--line);border-radius:100px;
+  padding:2px;
+}
+.langsw button{
+  padding:5px 11px;border-radius:100px;
+  font-family:var(--font-data);font-size:11px;font-weight:700;
+  letter-spacing:.05em;color:var(--muted);
+  transition:all .18s ease;
+}
+.langsw button:hover{color:var(--ink)}
+.langsw button[aria-pressed="true"]{
+  background:linear-gradient(160deg,#FFD75E,var(--gold) 55%,var(--gold-edge));
+  color:var(--ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+/* короткое название стадии в рельсе — вместо номера тура */
+.stagetag{
+  display:block;
+  font-family:var(--font-display);font-weight:700;
+  font-size:11px;letter-spacing:.02em;
+  color:var(--gold-deep);
+  line-height:1.2;
+  cursor:help;
+}
+
+/* ============================================================
+   Заголовок раздела
+   ============================================================ */
+.hero{padding:clamp(24px,5vw,44px) 0 18px}
+.hero-eyebrow{
+  font-family:var(--font-data);
+  font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--gold-deep);
+  margin-bottom:10px;
+}
+.hero-title{
+  font-family:var(--font-display);font-weight:800;
+  font-size:clamp(28px,6vw,46px);
+  line-height:1.02;letter-spacing:-.01em;
+}
+.hero-sub{color:var(--muted);margin-top:8px;max-width:56ch}
+
+/* ============================================================
+   Панель лиг / сезона
+   ============================================================ */
+.filters{
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  padding:16px 0;border-bottom:1px solid var(--line);
+}
+.chips{display:flex;gap:7px;min-width:0;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  padding:7px 14px;border-radius:100px;
+  background:var(--paper);
+  border:1px solid var(--line);
+  color:var(--muted);font-weight:600;font-size:13px;
+  white-space:nowrap;
+  transition:all .18s ease;
+}
+.chip:hover{color:var(--ink);border-color:var(--gold);box-shadow:var(--shadow)}
+.chip[aria-pressed="true"]{
+  background:linear-gradient(160deg,#FFD75E,var(--gold) 55%,var(--gold-edge));
+  border-color:var(--gold-edge);
+  color:var(--ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6), var(--shadow);
+}
+.chip--static{
+  border-color:var(--gold);background:var(--gold-soft);color:var(--gold-deep);
+  cursor:default;font-family:var(--font-data);font-size:12px;
+}
+
+.spacer{flex:1 1 auto}
+
+.search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--paper);
+  border:1px solid var(--line);border-radius:100px;
+  padding:6px 14px;min-width:190px;
+  transition:border-color .18s ease;
+}
+.search:focus-within{border-color:var(--gold)}
+.search input{background:none;border:none;outline:none;width:100%;font-size:13px}
+.search input::placeholder{color:var(--muted)}
+.search svg{flex:none;color:var(--muted)}
+
+/* вкладки: результаты / расписание / таблица */
+.viewtabs{
+  display:flex;gap:26px;padding:18px 0 4px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.viewtabs::-webkit-scrollbar{display:none}
+.viewtabs button{
+  position:relative;flex:none;padding-bottom:10px;
+  font-family:var(--font-display);font-weight:500;
+  font-size:13px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);
+  transition:color .18s ease;
+}
+.viewtabs button:hover{color:var(--ink)}
+.viewtabs button[aria-selected="true"]{color:var(--ink)}
+.viewtabs button[aria-selected="true"]::after{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--gold),var(--gold-edge));
+}
+
+/* ============================================================
+   СИГНАТУРА: счёт как золотое тиснение
+   Сыгранный матч получает золотую пластину, будущий — контур.
+   ============================================================ */
+.list{padding:18px 0 60px;display:flex;flex-direction:column;gap:9px}
+
+.daygroup{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+.daygroup:first-child{margin-top:0}
+.dayhead{
+  display:flex;align-items:center;gap:12px;
+  font-family:var(--font-data);font-size:11px;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);
+  margin:6px 0 10px;
+}
+.dayhead::after{content:'';flex:1;height:1px;background:var(--line)}
+
+.match{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:0 16px;
+  align-items:center;
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:12px 16px;
+  box-shadow:var(--shadow);
+  transition:border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.match:hover{border-color:var(--gold);transform:translateY(-1px);box-shadow:var(--shadow-up)}
+@media (prefers-reduced-motion:reduce){
+  .match,.match:hover{transition:none;transform:none}
+}
+
+/* левый рельс: тур / раунд / этап */
+.rail{
+  font-family:var(--font-data);font-size:11px;font-weight:500;
+  color:var(--muted);
+  text-align:center;min-width:46px;
+  border-right:1px solid var(--line);
+  padding-right:14px;
+  align-self:stretch;display:grid;place-content:center;
+}
+.rail b{display:block;font-size:16px;color:var(--gold-deep);font-weight:700;line-height:1.1}
+
+.row{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;gap:12px;
+}
+
+.side{display:flex;align-items:center;gap:10px;min-width:0}
+.side--home{justify-content:flex-end;text-align:right}
+.side--away{justify-content:flex-start;text-align:left}
+.name{
+  font-weight:600;font-size:14.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.badge{
+  width:26px;height:26px;object-fit:contain;flex:none;
+}
+.badge-fallback{
+  width:26px;height:26px;flex:none;border-radius:50%;
+  background:var(--gold-soft);border:1px solid var(--line);
+  display:grid;place-items:center;
+  font-family:var(--font-data);font-size:10px;color:var(--gold-deep);
+}
+
+/* пластина счёта — базовое состояние: контур (матч ещё не сыгран) */
+.screen{
+  position:relative;overflow:hidden;
+  background:var(--paper);
+  border:1.5px solid var(--gold);
+  border-radius:var(--r-sm);
+  padding:7px 14px;min-width:88px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.screen .num{
+  font-family:var(--font-display);font-weight:700;
+  font-size:21px;line-height:1;
+  font-variant-numeric:tabular-nums;
+  color:var(--ink);
+}
+.screen .sep{color:rgba(25,21,16,.42);font-size:17px;line-height:1}
+.screen .clock{
+  font-family:var(--font-data);font-weight:500;font-size:15px;
+  color:var(--gold-deep);letter-spacing:.04em;
+}
+.screen .vs{
+  font-family:var(--font-display);font-weight:700;font-size:13px;
+  letter-spacing:.1em;color:var(--muted);
+}
+
+
+/* пластина счёта + дата под ней */
+.scorebox{
+  display:grid;justify-items:center;gap:4px;
+}
+.scoredate{
+  font-family:var(--font-data);font-size:10.5px;
+  color:var(--muted);letter-spacing:.02em;white-space:nowrap;
+}
+
+/* результат — золотое тиснение */
+.screen--final{
+  background:linear-gradient(160deg,#FFDD6E,var(--gold) 48%,var(--gold-edge));
+  border-color:var(--gold-edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 2px rgba(120,82,3,.18);
+}
+/* тонкая штриховка «шлифованного металла» */
+.screen--final::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(115deg,
+    rgba(255,255,255,.16) 0 1px, transparent 1px 4px);
+}
+.screen--final .num{color:#33240A;text-shadow:0 1px 0 rgba(255,255,255,.35)}
+.screen--final .sep{color:rgba(51,36,10,.5)}
+
+/* идёт прямо сейчас */
+.screen--live{
+  background:var(--paper);
+  border-color:var(--live);
+}
+.screen--live .num{color:var(--live)}
+.screen--live .sep{color:rgba(214,40,15,.45)}
+
+.foot{
+  grid-column:2;
+  display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;
+  margin-top:9px;padding-top:9px;border-top:1px solid var(--line);
+  font-family:var(--font-data);font-size:11px;color:var(--muted);
+}
+.tag{display:inline-flex;align-items:center;gap:5px}
+.dot-live{
+  width:6px;height:6px;border-radius:50%;background:var(--live);
+  animation:pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dot-live{animation:none}}
+.tag--live{color:var(--live);font-weight:700}
+
+/* карточка события (UFC / Формула-1) */
+.event{
+  display:grid;grid-template-columns:auto 1fr;gap:0 16px;
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--r);padding:14px 16px;
+  box-shadow:var(--shadow);
+  transition:border-color .2s ease, box-shadow .2s ease;
+}
+.event:hover{border-color:var(--gold);box-shadow:var(--shadow-up)}
+.event-title{
+  font-family:var(--font-display);font-weight:500;
+  font-size:16px;line-height:1.25;
+}
+.event-sub{color:var(--muted);font-size:13px;margin-top:4px}
+.event-right{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:14px;flex-wrap:wrap;
+}
+.winner{color:var(--gold-deep);font-weight:700}
+
+/* ============================================================
+   Турнирная таблица
+   ============================================================ */
+.tablewrap{
+  padding:18px 0 60px;overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+table{border-collapse:collapse;width:100%;min-width:620px}
+thead th{
+  font-family:var(--font-data);font-size:10.5px;font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  text-align:center;padding:0 8px 12px;
+  border-bottom:1px solid var(--line-2);
+}
+thead th:nth-child(2){text-align:left}
+tbody td{
+  padding:11px 8px;text-align:center;
+  border-bottom:1px solid var(--line);
+  font-family:var(--font-data);font-size:13px;
+  font-variant-numeric:tabular-nums;
+}
+tbody td:nth-child(2){
+  text-align:left;font-family:var(--font-body);
+  font-weight:600;font-size:14px;
+}
+tbody tr:hover{background:rgba(242,180,23,.07)}
+.pos{
+  display:inline-grid;place-items:center;
+  width:24px;height:24px;border-radius:var(--r-sm);
+  background:var(--paper);border:1px solid var(--line-2);
+  font-weight:700;font-size:12px;
+}
+.pos--top{
+  background:linear-gradient(160deg,#FFDD6E,var(--gold) 55%,var(--gold-edge));
+  border-color:var(--gold-edge);color:#33240A;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65);
+}
+.pos--euro{background:var(--gold-soft);border-color:var(--gold);color:var(--gold-deep)}
+.tteam{display:flex;align-items:center;gap:10px}
+.pts{color:var(--gold-deep);font-weight:700;font-size:14px}
+
+
+/* ============================================================
+   Форма последних матчей и зоны турнира
+   ============================================================ */
+.form{display:flex;gap:3px;justify-content:center}
+.f{
+  width:19px;height:19px;flex:none;
+  display:grid;place-items:center;border-radius:4px;
+  font-family:var(--font-data);font-size:10px;font-weight:700;
+  cursor:help;
+}
+.f--w{background:linear-gradient(160deg,#FFD75E,var(--gold) 55%,var(--gold-edge));color:#33240A;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}
+.f--d{background:#EDE7D8;color:var(--muted)}
+.f--l{background:var(--live);color:#fff}
+.form-empty{color:var(--muted);font-family:var(--font-data);font-size:12px}
+.td-form{white-space:nowrap}
+
+/* цветная полоса зоны слева от места */
+tbody tr[class^="z-"] td:first-child,
+tbody tr[class*=" z-"] td:first-child{position:relative}
+tbody tr[class^="z-"] td:first-child::before,
+tbody tr[class*=" z-"] td:first-child::before{
+  content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:2px;
+}
+tr.z-ucl  td:first-child::before{background:var(--gold)}
+tr.z-uel  td:first-child::before{background:#4A7FB5}
+tr.z-uecl td:first-child::before{background:#58A06E}
+tr.z-rel  td:first-child::before{background:var(--live)}
+
+.pos--ucl{border-color:var(--gold);background:var(--gold-soft);color:var(--gold-deep)}
+.pos--uel{border-color:#4A7FB5;background:#EAF1F8;color:#2F5C88}
+.pos--uecl{border-color:#58A06E;background:#E9F5EC;color:#31724A}
+.pos--rel{border-color:var(--live);background:#FCEAE7;color:#A81E0B}
+
+.legend{
+  display:flex;flex-wrap:wrap;gap:8px 18px;
+  padding:2px 0 6px;font-size:12px;color:var(--muted);
+}
+.legend-item{display:inline-flex;align-items:center;gap:7px}
+.legend-bar{width:3px;height:13px;border-radius:2px;flex:none}
+.legend-bar--ucl{background:var(--gold)}
+.legend-bar--uel{background:#4A7FB5}
+.legend-bar--uecl{background:#58A06E}
+.legend-bar--rel{background:var(--live)}
+
+.hint-fix{
+  display:inline-block;margin-top:6px;
+  font-family:var(--font-data);font-size:11.5px;line-height:1.55;
+  color:var(--gold-deep);
+}
+.hint{
+  margin:10px 0 0;padding:10px 14px;
+  border:1px solid var(--line);border-left:3px solid var(--gold);
+  border-radius:var(--r-sm);background:var(--paper);
+  font-size:12.5px;color:var(--muted);
+}
+
+
+/* заголовок группы внутри таблицы */
+tbody tr.grouprow td{
+  text-align:left;padding:16px 8px 8px;
+  font-family:var(--font-data);font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--gold-deep);border-bottom:1px solid var(--line-2);
+}
+tbody tr.grouprow:hover{background:none}
+
+/* откуда пришла таблица */
+.srcline{
+  margin:6px 0 0;
+  font-family:var(--font-data);font-size:11px;color:var(--muted);
+}
+
+/* ============================================================
+   Бомбардиры и ассистенты
+   ============================================================ */
+.ptabs{
+  display:inline-flex;gap:2px;margin:18px 0 4px;
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:100px;padding:3px;
+}
+.ptabs button{
+  padding:7px 16px;border-radius:100px;
+  font-weight:600;font-size:13px;color:var(--muted);
+  white-space:nowrap;transition:all .18s ease;
+}
+.ptabs button:hover{color:var(--ink)}
+.ptabs button[aria-pressed="true"]{
+  background:linear-gradient(160deg,#FFD75E,var(--gold) 55%,var(--gold-edge));
+  color:var(--ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+.ptable{min-width:580px}
+.ptable .td-player{text-align:left}
+.ptable .td-club{
+  text-align:left;font-family:var(--font-body);
+  font-size:13px;color:var(--muted);
+}
+.avatar{
+  width:26px;height:26px;flex:none;border-radius:50%;
+  object-fit:cover;background:var(--gold-soft);
+}
+
+@media (max-width:760px){
+  .f{width:17px;height:17px;font-size:9px}
+  .ptabs button{padding:7px 12px;font-size:12px}
+}
+
+/* ============================================================
+   Состояния: загрузка, пусто, ошибка, демо
+   ============================================================ */
+.skel{
+  height:64px;border-radius:var(--r);
+  border:1px solid var(--line);
+  background:linear-gradient(90deg,var(--paper) 25%,var(--gold-soft) 50%,var(--paper) 75%);
+  background-size:400% 100%;
+  animation:shimmer 1.3s ease infinite;
+}
+@keyframes shimmer{to{background-position:-135% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+
+.notice{
+  padding:44px 24px;text-align:center;
+  background:var(--paper);
+  border:1px dashed var(--line-2);border-radius:var(--r-lg);
+  color:var(--muted);
+}
+.notice b{
+  display:block;color:var(--ink);font-family:var(--font-display);
+  font-weight:500;font-size:17px;margin-bottom:8px;
+}
+.notice button{
+  margin-top:16px;padding:9px 20px;border-radius:100px;
+  background:linear-gradient(160deg,#FFDD6E,var(--gold) 55%,var(--gold-edge));
+  border:1px solid var(--gold-edge);
+  color:var(--ink);font-weight:700;font-size:13px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+.demobar{
+  display:none;align-items:center;flex-wrap:wrap;gap:4px 10px;
+  margin-top:16px;padding:11px 16px;
+  border:1px solid var(--gold);border-radius:var(--r);
+  background:var(--gold-soft);
+  font-size:13px;color:var(--gold-deep);
+}
+.demobar.show{display:flex}
+.demobar{flex-direction:column;align-items:flex-start;gap:6px}
+.demobar-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.demobar strong{flex:none}
+.demobar-fix{
+  font-family:var(--font-data);font-size:11.5px;line-height:1.5;
+  color:var(--muted);
+}
+.demobar-fix:empty{display:none}
+.demobar span{color:var(--muted)}
+
+footer{
+  border-top:1px solid var(--line);
+  padding:28px 0 46px;
+  font-size:12.5px;color:var(--muted);
+  display:flex;flex-wrap:wrap;gap:8px 22px;justify-content:space-between;
+}
+
+
+/* ============================================================
+   Переключатель туров
+   ============================================================ */
+.roundnav{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin:18px 0 4px;
+}
+.roundnav button{
+  width:34px;height:34px;flex:none;
+  display:grid;place-items:center;
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);
+  font-size:19px;line-height:1;color:var(--muted);
+  transition:all .18s ease;
+}
+.roundnav button:hover{color:var(--gold-deep);border-color:var(--gold);box-shadow:var(--shadow)}
+.roundnav-title{
+  min-width:170px;text-align:center;
+  font-family:var(--font-display);font-weight:700;font-size:15px;
+}
+
+/* ============================================================
+   Календарь
+   ============================================================ */
+.cal{
+  max-width:620px;
+  margin:18px auto 8px;padding:14px;
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--r-lg);box-shadow:var(--shadow);
+}
+.cal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.cal-nav{
+  width:32px;height:32px;flex:none;
+  display:grid;place-items:center;border-radius:var(--r-sm);
+  font-size:19px;line-height:1;color:var(--muted);
+  transition:all .18s ease;
+}
+.cal-nav:hover{color:var(--gold-deep);background:var(--gold-soft)}
+.cal-title{
+  font-family:var(--font-display);font-weight:700;font-size:15px;
+}
+.cal-grid{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:4px;
+}
+.cal-dow{
+  text-align:center;padding-bottom:6px;
+  font-family:var(--font-data);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+}
+.cal-cell{
+  position:relative;
+  height:42px;
+  display:grid;place-items:center;
+  border:1px solid transparent;border-radius:var(--r-sm);
+  font-family:var(--font-data);font-size:13px;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+  transition:background .16s ease, border-color .16s ease;
+}
+.cal-cell--empty{pointer-events:none}
+.cal-cell:not(.cal-cell--empty):hover{background:var(--gold-soft);border-color:var(--gold)}
+
+/* точка = в этот день есть матчи */
+.cal-dot{
+  position:absolute;bottom:5px;left:50%;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:transparent;
+}
+.cal-cell.has-games .cal-dot{background:var(--gold-edge)}
+
+.cal-cell.is-today{border-color:var(--line-2);font-weight:700}
+.cal-cell.is-selected{
+  background:linear-gradient(160deg,#FFD75E,var(--gold) 55%,var(--gold-edge));
+  border-color:var(--gold-edge);font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+.cal-cell.is-selected .cal-dot{background:#33240A}
+
+.dayhead--cal{margin:20px 0 12px}
+
+@media (max-width:760px){
+  .roundnav-title{min-width:120px;font-size:13px}
+  .cal{padding:10px}
+  .cal-grid{gap:3px}
+  .cal-cell{height:44px;font-size:12px}
+}
+
+/* ============================================================
+   Адаптив
+   ============================================================ */
+@media (max-width:760px){
+  .brand-name{display:none}
+  .sportnav{margin-left:auto;min-width:0}
+  .langsw button{padding:5px 8px}
+  .sportnav button{padding:8px 10px;font-size:13px}
+  .viewtabs{gap:16px}
+  .viewtabs button{font-size:11px}
+  .hero{padding-top:20px}
+  .match{grid-template-columns:1fr;gap:10px;padding:12px 14px}
+  .rail{
+    border-right:none;border-bottom:1px solid var(--line);
+    padding:0 0 9px;text-align:left;place-content:start;
+    display:flex;align-items:baseline;gap:7px;
+  }
+  .rail b{display:inline;font-size:13px}
+  .foot{grid-column:1}
+  .row{gap:8px}
+  .name{font-size:13.5px}
+  .badge,.badge-fallback{display:none}
+  .name{white-space:normal;overflow:visible;line-height:1.25}
+  .screen{min-width:74px;padding:6px 10px}
+  .screen .num{font-size:19px}
+  .scoredate{font-size:10px}
+  .event{grid-template-columns:1fr;gap:10px}
+  .search{min-width:0;flex:1 1 150px}
+}
+
+@media (max-width:400px){
+  .chips{flex:1 1 100%}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="#" aria-label="ТАБЛО">
+      <span class="brand-lamp" aria-hidden="true"></span>
+      <span class="brand-name" id="brand-name">ТАБЛО</span>
+    </a>
+
+    <nav class="sportnav" role="tablist" id="sportnav"></nav>
+
+    <div class="langsw" role="group" id="langsw"></div>
+
+    <button class="icon-btn" id="refresh">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="hero-eyebrow" id="eyebrow">Сегодня</div>
+    <h1 class="hero-title" id="title">Футбол</h1>
+    <p class="hero-sub" id="subtitle">Результаты последних матчей и ближайшее расписание.</p>
+    <div class="demobar" id="demobar">
+      <div class="demobar-row">
+        <strong id="demo-title"></strong>
+        <span id="demo-text"></span>
+      </div>
+      <span class="demobar-fix" id="demo-fix"></span>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="chips" id="chips" role="group" aria-label="Турнир"></div>
+    <div class="spacer"></div>
+    <label class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.2-4.2"/>
+      </svg>
+      <input type="search" id="search">
+    </label>
+  </div>
+
+  <div class="viewtabs" role="tablist" aria-label="Раздел" id="viewtabs"></div>
+
+  <div id="content" aria-live="polite"></div>
+</main>
+
+<footer class="wrap">
+  <div><span id="brand-word"></span> · <span id="tagline"></span></div>
+  <div>TheSportsDB · <span id="footer-note"></span></div>
+</footer>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. КОНФИГУРАЦИЯ
+   ============================================================ */
+
+const CONFIG = {
+  // Источник для футбола: "thesportsdb" или "apifootball".
+  // UFC и Формула-1 всегда идут через TheSportsDB.
+  provider: "thesportsdb",
+
+  // --- TheSportsDB: работает сразу, ключ 123 бесплатный и общий ---
+  apiKey: "123",
+  base: "https://www.thesportsdb.com/api/v1/json",
+
+  // --- API-Football: точные названия стадий, нужен свой ключ ---
+  // Регистрация: dashboard.api-football.com (бесплатно, 100 запросов в сутки)
+  afKey: "",
+  afBase: "https://v3.football.api-sports.io",
+
+  // --- football-data.org: полная таблица, бесплатно и навсегда ---
+  // Ключ: football-data.org/client/register (10 запросов в минуту)
+  fdKey: "",
+  fdBase: "https://api.football-data.org/v4",
+
+  cacheTtl: 60_000,
+  timeout: 9_000
+};
+
+// Сезон европейского футбола: с июля начинается новый
+function footballSeason(d = new Date()) {
+  const y = d.getFullYear();
+  return d.getMonth() >= 6 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+}
+
+const SPORTS = [
+  {
+    id: "football",
+    kind: "match",
+    views: ["results", "schedule", "round", "cal", "table", "players"],
+    // id — идентификатор в TheSportsDB, afId — та же лига в API-Football
+    leagues: [
+      { id: "4480", afId: 2,   fdCode: "CL",  season: footballSeason() },
+      { id: "4328", afId: 39,  fdCode: "PL",  season: footballSeason() },
+      { id: "4335", afId: 140, fdCode: "PD",  season: footballSeason() },
+      { id: "4332", afId: 135, fdCode: "SA",  season: footballSeason() },
+      { id: "4331", afId: 78,  fdCode: "BL1", olCode: "bl1", season: footballSeason() },
+      { id: "4334", afId: 61,  fdCode: "FL1", season: footballSeason() }
+    ]
+  },
+  {
+    id: "ufc",
+    kind: "event",
+    views: ["results", "schedule"],
+    leagues: [{ id: "4443", season: String(new Date().getFullYear()) }]
+  },
+  {
+    id: "f1",
+    kind: "event",
+    views: ["results", "schedule"],
+    leagues: [{ id: "4370", season: String(new Date().getFullYear()) }]
+  }
+];
+
+/* ============================================================
+   2. ЯЗЫКИ
+   Чтобы добавить третий язык — скопируй блок и переведи.
+   ============================================================ */
+
+const I18N = {
+  ru: {
+    htmlLang: "ru",
+    brand: "ТАБЛО",
+    tagline: "результаты и расписание",
+    footerNote: "время указано в вашем часовом поясе",
+    refresh: "Обновить данные",
+    langLabel: "Язык интерфейса",
+    searchPh: "Поиск по команде…",
+    season: "Сезон",
+    sport:    { football: "Футбол", ufc: "UFC", f1: "Формула-1" },
+    sportSub: {
+      football: "Результаты последних матчей и ближайшее расписание.",
+      ufc: "Прошедшие турниры и ближайшие карды.",
+      f1: "Результаты Гран-при и календарь сезона."
+    },
+    view: { results: "Результаты", schedule: "Расписание", round: "Тур", cal: "Календарь", table: "Таблица", players: "Игроки" },
+    tabGoals: "Бомбардиры",
+    tabAssists: "Ассистенты",
+    thPlayer: "Игрок",
+    thClub: "Клуб",
+    thGoals: "Голы",
+    thAssists: "Пас",
+    thPen: "Пен.",
+    thForm: "Форма",
+    thFormTitle: "Последние 5 матчей",
+    thGoalsTitle: "Забитые мячи",
+    thAssistsTitle: "Голевые передачи",
+    thPenTitle: "Голы с пенальти",
+    formLetter: { W: "В", D: "Н", L: "П" },
+    formWord: { W: "победа", D: "ничья", L: "поражение" },
+    zone: {
+      ucl: "Лига чемпионов", uel: "Лига Европы",
+      uecl: "Лига конференций", rel: "Вылет"
+    },
+    noPlayersTitle: "Статистики игроков нет",
+    noPlayersText: "Этот источник не отдаёт бомбардиров и ассистентов.",
+    playersNeedAf: "Реальные данные по игрокам отдаёт только API-Football. TheSportsDB такого метода не имеет.",
+    tableCapped: "Здесь только 5 строк — больше бесплатный ключ TheSportsDB не отдаёт.",
+    tableFix: "Полная таблица: возьмите бесплатный ключ на football-data.org/client/register и впишите его в fdKey в начале скрипта.",
+    source: "Источник",
+    rows: "строк",
+    seasonOld: "Бесплатный тариф API-Football не открывает текущий сезон. Показаны данные за сезон",
+    viewAlias: { f1: { schedule: "Календарь" } },
+    roundPrev: "Предыдущий тур",
+    roundNext: "Следующий тур",
+    monthPrev: "Предыдущий месяц",
+    monthNext: "Следующий месяц",
+    dow: ["пн", "вт", "ср", "чт", "пт", "сб", "вс"],
+    today: "сегодня",
+    pickDay: "Выберите дату",
+    pickDayText: "Числа с точкой — дни, в которые есть матчи.",
+    noDayTitle: "В этот день матчей нет",
+    noDayText: "Выберите другую дату в календаре.",
+    noRoundTitle: "Тур не найден",
+    noRoundText: "API не отдаёт матчи этого тура. Попробуйте соседний.",
+    league: {
+      "4480": "Лига чемпионов", "4328": "АПЛ", "4335": "Ла Лига",
+      "4332": "Серия А", "4331": "Бундеслига", "4334": "Лига 1",
+      "4443": "UFC", "4370": "Формула-1"
+    },
+    demoTitle: "Демо-данные",
+    demoText: "Не удалось получить ответ от API — показан пример вёрстки, а не реальные матчи.",
+    err: {
+      file: "Страница открыта прямо с диска (file://). Браузер запрещает такой странице обращаться к API.",
+      cors: "Браузер заблокировал запрос к API — не хватает разрешения CORS.",
+      rate: "Слишком много запросов. У бесплатного ключа лимит 30 в минуту.",
+      http: "API ответил ошибкой",
+      timeout: "API не ответил вовремя.",
+      empty: "API ответил, но матчей не вернул.",
+      key: "Ключ API-Football отклонён."
+    },
+    errFix: {
+      file: "Запустите локальный сервер в папке с файлом: python3 -m http.server 8080 — и откройте http://localhost:8080",
+      cors: "Нужен прокси-посредник. Готовый Cloudflare Worker есть в README.",
+      rate: "Подождите минуту и нажмите кнопку обновления.",
+      http: "Проверьте ключ и адрес в блоке CONFIG в начале скрипта.",
+      timeout: "Проверьте подключение к интернету.",
+      empty: "Возможно, в этом турнире сейчас пауза или межсезонье.",
+      key: "Проверьте значение afKey в блоке CONFIG."
+    },
+    emptyTitle: "Ничего не найдено",
+    emptyText: "Попробуйте другой турнир или очистите поиск.",
+    noTableTitle: "Таблицы пока нет",
+    noTableText: "Для этого турнира API не отдаёт таблицу — на кубковых стадиях её просто не существует.",
+    retry: "Попробовать снова",
+    live: "идёт матч",
+    winner: "Победа",
+    tbd: "дата уточняется",
+    th:      { pos: "#", team: "Команда", p: "И", w: "В", d: "Н", l: "П", goals: "Мячи", gd: "±", pts: "О" },
+    thTitle: { p: "Игры", w: "Выигрыши", d: "Ничьи", l: "Поражения", goals: "Забито : пропущено", gd: "Разница мячей", pts: "Очки" },
+    stage: {
+      matchday:     (n) => ({ big: n, unit: "тур",  full: `${n}-й тур` }),
+      leaguePhase:  (n) => ({ big: n, unit: "тур",  full: `Общий этап, ${n}-й тур`, note: "Общий этап" }),
+      f1:           (n) => ({ big: n, unit: "этап", full: `${n}-й этап` }),
+      qualifier:    { short: "КВАЛ.",  full: "Квалификация" },
+      playoff:      { short: "ПЛ-ОФФ", full: "Раунд плей-офф" },
+      playoffSf:    { short: "1/2 ПО", full: "Полуфинал плей-офф" },
+      playoffFinal: { short: "Ф. ПО",  full: "Финал плей-офф" },
+      r16:          { short: "1/8",    full: "1/8 финала" },
+      qf:           { short: "1/4",    full: "1/4 финала" },
+      sf:           { short: "1/2",    full: "1/2 финала" },
+      final:        { short: "ФИНАЛ",  full: "Финал" },
+      preseason:    { short: "ПРЕД.",  full: "Предсезонный матч" }
+    }
+  },
+
+  uz: {
+    htmlLang: "uz",
+    brand: "TABLO",
+    tagline: "natijalar va jadval",
+    footerNote: "vaqt sizning vaqt mintaqangizda",
+    refresh: "Ma'lumotlarni yangilash",
+    langLabel: "Interfeys tili",
+    searchPh: "Jamoa qidirish…",
+    season: "Mavsum",
+    sport:    { football: "Futbol", ufc: "UFC", f1: "Formula-1" },
+    sportSub: {
+      football: "So'nggi o'yinlar natijalari va yaqin kunlardagi jadval.",
+      ufc: "O'tgan turnirlar va yaqinlashib kelayotgan janglar.",
+      f1: "Gran-pri natijalari va mavsum kalendari."
+    },
+    view: { results: "Natijalar", schedule: "Jadval", round: "Tur", cal: "Kalendar", table: "Turnir jadvali", players: "O'yinchilar" },
+    tabGoals: "Bombardirlar",
+    tabAssists: "Assistentlar",
+    thPlayer: "O'yinchi",
+    thClub: "Klub",
+    thGoals: "Gollar",
+    thAssists: "Uzatma",
+    thPen: "Pen.",
+    thForm: "Shakl",
+    thFormTitle: "So'nggi 5 o'yin",
+    thGoalsTitle: "Urilgan gollar",
+    thAssistsTitle: "Gol uzatmalari",
+    thPenTitle: "Penaltidan gollar",
+    formLetter: { W: "G", D: "D", L: "M" },
+    formWord: { W: "g'alaba", D: "durang", L: "mag'lubiyat" },
+    zone: {
+      ucl: "Chempionlar ligasi", uel: "Yevropa ligasi",
+      uecl: "Konferensiya ligasi", rel: "Tushish"
+    },
+    noPlayersTitle: "O'yinchilar statistikasi yo'q",
+    noPlayersText: "Bu manba bombardirlar va assistentlarni bermaydi.",
+    playersNeedAf: "O'yinchilar bo'yicha haqiqiy ma'lumotni faqat API-Football beradi. TheSportsDB'da bunday metod yo'q.",
+    tableCapped: "Bu yerda atigi 5 qator — TheSportsDB bepul kaliti ko'proq bermaydi.",
+    tableFix: "To'liq jadval uchun football-data.org/client/register saytidan bepul kalit oling va uni skript boshidagi fdKey ga yozing.",
+    source: "Manba",
+    rows: "qator",
+    seasonOld: "API-Football bepul tarifi joriy mavsumni ochmaydi. Ko'rsatilgan ma'lumot — mavsum",
+    viewAlias: { f1: { schedule: "Kalendar" } },
+    roundPrev: "Oldingi tur",
+    roundNext: "Keyingi tur",
+    monthPrev: "Oldingi oy",
+    monthNext: "Keyingi oy",
+    dow: ["Du", "Se", "Cho", "Pa", "Ju", "Sha", "Yak"],
+    today: "bugun",
+    pickDay: "Sanani tanlang",
+    pickDayText: "Nuqtali sanalar — o'yin bo'lgan kunlar.",
+    noDayTitle: "Bu kuni o'yin yo'q",
+    noDayText: "Kalendardan boshqa sanani tanlang.",
+    noRoundTitle: "Tur topilmadi",
+    noRoundText: "API bu tur o'yinlarini bermayapti. Qo'shni turni sinab ko'ring.",
+    league: {
+      "4480": "Chempionlar ligasi", "4328": "APL", "4335": "La Liga",
+      "4332": "Seriya A", "4331": "Bundesliga", "4334": "Liga 1",
+      "4443": "UFC", "4370": "Formula-1"
+    },
+    demoTitle: "Namoyish ma'lumotlari",
+    demoText: "API javob bermadi — bu haqiqiy o'yinlar emas, faqat sahifa namunasi.",
+    err: {
+      file: "Sahifa to'g'ridan-to'g'ri diskdan ochilgan (file://). Brauzer bunday sahifaga API'ga murojaat qilishni taqiqlaydi.",
+      cors: "Brauzer API so'rovini bloklalab qo'ydi — CORS ruxsati yo'q.",
+      rate: "So'rovlar juda ko'p. Bepul kalit uchun limit — daqiqasiga 30 ta.",
+      http: "API xatolik qaytardi",
+      timeout: "API o'z vaqtida javob bermadi.",
+      empty: "API javob berdi, lekin o'yinlarni qaytarmadi.",
+      key: "API-Football kaliti rad etildi."
+    },
+    errFix: {
+      file: "Fayl turgan papkada lokal server ishga tushiring: python3 -m http.server 8080 — so'ng http://localhost:8080 ni oching.",
+      cors: "Vositachi proksi kerak. Tayyor Cloudflare Worker README'da bor.",
+      rate: "Bir daqiqa kuting va yangilash tugmasini bosing.",
+      http: "Skript boshidagi CONFIG blokida kalit va manzilni tekshiring.",
+      timeout: "Internet ulanishini tekshiring.",
+      empty: "Ehtimol, bu turnirda hozir tanaffus yoki mavsumlararo davr.",
+      key: "CONFIG blokidagi afKey qiymatini tekshiring."
+    },
+    emptyTitle: "Hech narsa topilmadi",
+    emptyText: "Boshqa turnirni tanlang yoki qidiruvni tozalang.",
+    noTableTitle: "Turnir jadvali hozircha yo'q",
+    noTableText: "Bu turnir uchun API jadval bermaydi — kubok bosqichlarida u umuman mavjud emas.",
+    retry: "Qayta urinish",
+    live: "o'yin ketmoqda",
+    winner: "G'olib",
+    tbd: "sana aniqlanmagan",
+    th:      { pos: "#", team: "Jamoa", p: "O'Y", w: "G'", d: "D", l: "M", goals: "Gollar", gd: "±", pts: "OCH" },
+    thTitle: { p: "O'yinlar", w: "G'alabalar", d: "Duranglar", l: "Mag'lubiyatlar", goals: "Urilgan : o'tkazilgan", gd: "Gollar farqi", pts: "Ochko" },
+    stage: {
+      matchday:     (n) => ({ big: n, unit: "tur",    full: `${n}-tur` }),
+      leaguePhase:  (n) => ({ big: n, unit: "tur",    full: `Umumiy bosqich, ${n}-tur`, note: "Umumiy bosqich" }),
+      f1:           (n) => ({ big: n, unit: "bosqich", full: `${n}-bosqich` }),
+      qualifier:    { short: "SARAL.",  full: "Saralash" },
+      playoff:      { short: "PLEY-OF", full: "Pley-off raundi" },
+      playoffSf:    { short: "1/2 PO",  full: "Pley-off yarim finali" },
+      playoffFinal: { short: "F. PO",   full: "Pley-off finali" },
+      r16:          { short: "1/8",     full: "1/8 final" },
+      qf:           { short: "1/4",     full: "1/4 final" },
+      sf:           { short: "1/2",     full: "1/2 final" },
+      final:        { short: "FINAL",   full: "Final" },
+      preseason:    { short: "MAVS.",   full: "Mavsumgacha o'yin" }
+    }
+  }
+};
+
+/* Названия клубов приходят из API на английском. Для русского
+   подставляем привычное написание; в узбекском принято оставлять
+   оригинал, поэтому словаря для него нет. Дополняй по мере надобности. */
+const CLUBS_RU = {
+  "real madrid": "Реал Мадрид", "barcelona": "Барселона", "atletico madrid": "Атлетико",
+  "athletic club": "Атлетик", "villarreal": "Вильярреал", "real betis": "Бетис",
+  "sevilla": "Севилья", "valencia": "Валенсия", "real sociedad": "Реал Сосьедад",
+  "manchester city": "Манчестер Сити", "manchester united": "Манчестер Юнайтед",
+  "liverpool": "Ливерпуль", "arsenal": "Арсенал", "chelsea": "Челси",
+  "tottenham": "Тоттенхэм", "tottenham hotspur": "Тоттенхэм", "newcastle": "Ньюкасл",
+  "newcastle united": "Ньюкасл", "aston villa": "Астон Вилла", "brighton": "Брайтон",
+  "west ham": "Вест Хэм", "west ham united": "Вест Хэм", "everton": "Эвертон",
+  "bayern munich": "Бавария", "bayern munchen": "Бавария", "bayer leverkusen": "Байер",
+  "rb leipzig": "Лейпциг", "borussia dortmund": "Боруссия Дортмунд",
+  "vfb stuttgart": "Штутгарт", "eintracht frankfurt": "Айнтрахт",
+  "inter": "Интер", "internazionale": "Интер", "ac milan": "Милан", "milan": "Милан",
+  "juventus": "Ювентус", "napoli": "Наполи", "atalanta": "Аталанта",
+  "as roma": "Рома", "roma": "Рома", "lazio": "Лацио", "fiorentina": "Фиорентина",
+  "paris saint germain": "ПСЖ", "paris saint-germain": "ПСЖ", "paris sg": "ПСЖ",
+  "monaco": "Монако", "marseille": "Марсель", "lille": "Лилль",
+  "nice": "Ницца", "lyon": "Лион", "lens": "Ланс",
+
+  // остальные клубы пяти лиг
+  "crystal palace": "Кристал Пэлас", "fulham": "Фулхэм", "brentford": "Брентфорд",
+  "nottingham forest": "Ноттингем Форест", "bournemouth": "Борнмут", "wolves": "Вулверхэмптон",
+  "leeds": "Лидс", "burnley": "Бернли", "sunderland": "Сандерленд",
+  "girona": "Жирона", "celta vigo": "Сельта", "osasuna": "Осасуна",
+  "rayo vallecano": "Райо Вальекано", "getafe": "Хетафе", "mallorca": "Мальорка",
+  "alaves": "Алавес", "espanyol": "Эспаньол", "elche": "Эльче",
+  "levante": "Леванте", "oviedo": "Овьедо",
+  "bologna": "Болонья", "torino": "Торино", "udinese": "Удинезе", "genoa": "Дженоа",
+  "como": "Комо", "cagliari": "Кальяри", "parma": "Парма", "lecce": "Лечче",
+  "verona": "Верона", "sassuolo": "Сассуоло", "pisa": "Пиза", "cremonese": "Кремонезе",
+  "hoffenheim": "Хоффенхайм", "werder bremen": "Вердер", "mainz": "Майнц",
+  "augsburg": "Аугсбург", "borussia monchengladbach": "Боруссия Мёнхенгладбах",
+  "union berlin": "Унион Берлин", "heidenheim": "Хайденхайм",
+  "koln": "Кёльн", "hamburger sv": "Гамбург", "hamburger": "Гамбург",
+  "leipzig": "Лейпциг", "stuttgart": "Штутгарт", "leverkusen": "Байер",
+  "monchengladbach": "Боруссия Мёнхенгладбах", "st pauli": "Санкт-Паули",
+  "werder bremen": "Вердер", "bremen": "Вердер", "dortmund": "Боруссия Дортмунд",
+  "bayern munchen": "Бавария", "eintracht": "Айнтрахт", "holstein kiel": "Хольштайн",
+  "bochum": "Бохум", "wolfsburg": "Вольфсбург", "freiburg": "Фрайбург",
+  "strasbourg": "Страсбур", "rennes": "Ренн", "toulouse": "Тулуза", "nantes": "Нант",
+  "auxerre": "Осер", "angers": "Анже", "le havre": "Гавр", "metz": "Мец",
+  "lorient": "Лорьян", "paris fc": "Пари ФК", "brest": "Брест",
+
+  // регулярные участники Лиги чемпионов
+  "benfica": "Бенфика", "psv": "ПСВ", "sporting cp": "Спортинг", "ajax": "Аякс",
+  "club brugge": "Брюгге", "feyenoord": "Фейеноорд", "shakhtar donetsk": "Шахтёр",
+  "celtic": "Селтик", "galatasaray": "Галатасарай", "olympiacos": "Олимпиакос",
+  "bodo/glimt": "Буде-Глимт", "slavia praha": "Славия Прага",
+  "union saint-gilloise": "Юнион Сент-Жиллуаз", "qarabag": "Карабах",
+  "kairat": "Кайрат", "copenhagen": "Копенгаген"
+};
+
+/* Один и тот же клуб приходит по-разному: «FC Barcelona», «Barcelona»,
+   «Real Madrid CF», «FC Bayern München». Приводим к общему виду:
+   снимаем диакритику и типовые приставки-окончания. */
+function clubKey(raw) {
+  return String(raw)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/\./g, "")
+    .replace(/\b\d{1,4}\b/g, " ")
+    .replace(/\s+/g, " ").trim()
+    .replace(/^(fc|afc|ac|as|ss|ssc|sc|rc|cf|cd|sv|vfb|vfl|rb|bsc|tsg|fsv|tsv|sg|kv|ogc|rcd)\s+/, "")
+    .replace(/\s+(fc|afc|cf|sc|ac|bc|sk|sv|cd|cp|ii)$/, "")
+    .trim();
+}
+
+function clubName(raw) {
+  if (!raw) return "";
+  if (state.lang !== "ru") return raw;
+  return CLUBS_RU[clubKey(raw)] || raw;
+}
+
+const t = () => I18N[state.lang];
+
+/* ============================================================
+   3. СОСТОЯНИЕ
+   ============================================================ */
+
+const state = {
+  lang: (navigator.language || "").toLowerCase().startsWith("uz") ? "uz" : "ru",
+  sport: SPORTS[0],
+  league: SPORTS[0].leagues[0],
+  view: "results",
+  query: "",
+  usedDemo: false,
+  seasonShift: null,                        // сезон, который реально отдал API
+  tableSource: null,                        // откуда пришла таблица
+  lastError: null,                          // чем именно закончился последний запрос
+  playerKind: "goals",                      // "goals" | "assists" внутри вкладки «Игроки»
+  round: null,                              // выбранный тур, null = определить сам
+  calMonth: startOfMonth(new Date()),       // какой месяц показан в календаре
+  calDay: null,                             // выбранная дата
+  dayIndex: new Map()                       // "2026-08-24" -> сколько матчей, для точек
+};
+
+function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+
+const cache = new Map();
+
+/* ============================================================
+   4. УТИЛИТЫ
+   ============================================================ */
+
+const $ = (sel) => document.querySelector(sel);
+
+function esc(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+/* У браузеров нет узбекских названий месяцев — Intl отдаёт "M08 25, Tue".
+   Поэтому для uz форматируем дату руками. */
+const UZ_MONTHS = ["yanvar","fevral","mart","aprel","may","iyun",
+                   "iyul","avgust","sentabr","oktabr","noyabr","dekabr"];
+const UZ_DOW = ["Yak","Dush","Sesh","Chor","Pay","Jum","Shan"];
+
+function fmtDay(d) {
+  if (!d) return t().tbd;
+  if (state.lang === "uz") {
+    return `${UZ_DOW[d.getDay()]}, ${d.getDate()}-${UZ_MONTHS[d.getMonth()]}`;
+  }
+  return new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "numeric", month: "long" }).format(d);
+}
+const pad = (n) => String(n).padStart(2, "0");
+const fmtShort = (d) => d ? `${pad(d.getDate())}.${pad(d.getMonth() + 1)}` : "";
+const fmtTime  = (d) => d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : "—:—";
+
+function parseDate(ev) {
+  if (ev.strTimestamp) {
+    const raw = ev.strTimestamp.trim().replace(" ", "T");
+    const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : raw + "Z");
+    if (!isNaN(d)) return d;
+  }
+  if (ev.dateEvent) {
+    const time = (ev.strTime && ev.strTime !== "00:00:00") ? ev.strTime : "12:00:00";
+    const d = new Date(`${ev.dateEvent}T${time}Z`);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
+const dayKey = (d) => d ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` : "tbd";
+// ISO-ключ для запросов и для индекса дней: 2026-08-24
+const isoKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const sameDay = (a, b) => a && b && isoKey(a) === isoKey(b);
+
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function fmtMonth(d) {
+  if (state.lang === "uz") return `${cap(UZ_MONTHS[d.getMonth()])} ${d.getFullYear()}`;
+  // Intl добавляет «г.» в конце — для заголовка календаря это лишнее
+  const name = new Intl.DateTimeFormat("ru-RU", { month: "long" }).format(d);
+  return `${cap(name)} ${d.getFullYear()}`;
+}
+// Понедельник — первый день недели
+const dowIndex = (d) => (d.getDay() + 6) % 7;
+const initials = (name) => String(name || "?").trim().slice(0, 2).toUpperCase();
+
+/* ============================================================
+   5. СТАДИИ ТУРНИРА
+   Это то место, где раньше врал сайт: числа вроде 400 выводились
+   как «400-й тур». На деле у TheSportsDB это коды стадий.
+   ============================================================ */
+
+// Документировано на thesportsdb.com/docs_api_data
+const TSDB_STAGE = {
+  125: "qf",           // четвертьфинал
+  150: "sf",           // полуфинал
+  160: "playoff",      // раунд плей-офф
+  170: "playoffSf",    // полуфинал плей-офф
+  180: "playoffFinal", // финал плей-офф
+  200: "final",        // финал
+  400: "qualifier",    // квалификация
+  500: "preseason"     // предсезонный матч
+};
+
+function stageFromTSDB(intRound, sportId, leagueId) {
+  const n = Number(intRound);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (TSDB_STAGE[n]) return { kind: TSDB_STAGE[n] };
+  // Незнакомый спецкод лучше не показывать вовсе, чем выдать за номер тура
+  if (n > 100) return null;
+  if (sportId === "f1") return { kind: "f1", n };
+  if (leagueId === "4480") return { kind: "leaguePhase", n };
+  return { kind: "matchday", n };
+}
+
+// API-Football отдаёт стадию строкой — она точнее любого кода
+function stageFromAF(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  const low = s.toLowerCase();
+  const n = Number((s.match(/(\d+)\s*$/) || [])[1]);
+
+  if (low.includes("qualif"))                       return { kind: "qualifier" };
+  if (low.includes("play-off") || low.includes("playoff")) return { kind: "playoff" };
+  if (low.includes("quarter"))                      return { kind: "qf" };
+  if (low.includes("semi"))                         return { kind: "sf" };
+  if (low.includes("round of 16") || low.includes("8th final")) return { kind: "r16" };
+  if (low === "final" || low.endsWith(" final"))    return { kind: "final" };
+  if ((low.includes("league stage") || low.includes("group stage")) && n)
+    return { kind: "leaguePhase", n };
+  if (low.includes("regular season") && n)          return { kind: "matchday", n };
+  if (n && low.replace(/\d+/g, "").trim().length <= 12) return { kind: "matchday", n };
+  return { kind: "raw", text: s };  // покажем как есть — честнее, чем выдумывать
+}
+
+// API отдаёт зону строкой вроде "Promotion - Champions League (Group Stage)"
+// или "Relegation - Championship". Порядок проверок важен: «вылет» ищем первым,
+// иначе «Relegation - Championship» может зацепиться за другое правило.
+function zoneOf(desc) {
+  const d = String(desc || "").toLowerCase();
+  if (!d) return null;
+  if (d.includes("relegation")) return "rel";
+  if (d.includes("champions league")) return "ucl";
+  if (d.includes("europa league")) return "uel";
+  if (d.includes("conference")) return "uecl";
+  if (d.includes("promotion")) return "ucl";
+  return null;
+}
+
+// Когда источник не сказал зону — считаем по месту
+function zoneByPosition(leagueId, rank, total) {
+  const z = ZONES[leagueId];
+  if (!z || !total) return null;
+  if (rank <= z.ucl) return "ucl";
+  if (rank <= z.uel) return "uel";
+  if (rank <= z.uecl) return "uecl";
+  if (z.rel && rank > total - z.rel) return "rel";
+  return null;
+}
+
+function stageLabel(stage) {
+  if (!stage) return null;
+  if (stage.kind === "raw") return { short: stage.text, full: stage.text };
+  const def = t().stage[stage.kind];
+  if (!def) return null;
+  return typeof def === "function" ? def(stage.n) : def;
+}
+
+/* ============================================================
+   6. СЛОЙ ДАННЫХ
+   ============================================================ */
+
+// Ошибка с понятной причиной — чтобы страница могла объяснить,
+// что именно сломалось, а не показывать «не удалось получить ответ».
+class ApiError extends Error {
+  constructor(kind, detail) { super(kind); this.kind = kind; this.detail = detail || ""; }
+}
+
+const isFileOrigin = () => location.protocol === "file:";
+
+async function getJSON(path) {
+  const url = `${CONFIG.base}/${CONFIG.apiKey}/${path}`;
+  const hit = cache.get(url);
+  if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.data;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CONFIG.timeout);
+  let res;
+  try {
+    res = await fetch(url, { signal: ctrl.signal });
+  } catch (e) {
+    // fetch падает одинаково и при CORS, и при отсутствии сети —
+    // различаем по протоколу страницы
+    throw new ApiError(
+      e.name === "AbortError" ? "timeout" : (isFileOrigin() ? "file" : "cors"), path);
+  } finally { clearTimeout(timer); }
+
+  if (res.status === 429) throw new ApiError("rate", "429");
+  if (!res.ok) throw new ApiError("http", String(res.status));
+
+  const data = await res.json();
+  cache.set(url, { at: Date.now(), data });
+  return data;
+}
+
+function useApiFootball(sport) {
+  return CONFIG.provider === "apifootball" && CONFIG.afKey && sport.id === "football";
+}
+
+async function afGet(path) {
+  const url = `${CONFIG.afBase}${path}`;
+  const hit = cache.get(url);
+  if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.data;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CONFIG.timeout);
+  let res;
+  try {
+    res = await fetch(url, { signal: ctrl.signal, headers: { "x-apisports-key": CONFIG.afKey } });
+  } catch (e) {
+    throw new ApiError(
+      e.name === "AbortError" ? "timeout" : (isFileOrigin() ? "file" : "cors"), path);
+  } finally { clearTimeout(timer); }
+
+  if (res.status === 401 || res.status === 403) throw new ApiError("key", String(res.status));
+  if (res.status === 429) throw new ApiError("rate", "429");
+  if (!res.ok) throw new ApiError("http", String(res.status));
+
+  const data = await res.json();
+  // API-Football кладёт ошибки в тело ответа со статусом 200
+  const errs = data.errors;
+  if (errs && !Array.isArray(errs) && Object.keys(errs).length) {
+    const first = Object.values(errs)[0];
+    throw new ApiError(/key|token|subscription/i.test(String(first)) ? "key" : "http", String(first));
+  }
+  cache.set(url, { at: Date.now(), data });
+  return data;
+}
+
+/* OpenLigaDB — открытый немецкий проект. Ключа не требует вообще
+   и отдаёт таблицу целиком. Минус: только немецкие лиги, и это
+   community-проект, поэтому иногда отвечает ошибкой. */
+async function olGet(path) {
+  const url = `https://api.openligadb.de${path}`;
+  const hit = cache.get(url);
+  if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.data;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CONFIG.timeout);
+  let res;
+  try {
+    res = await fetch(url, { signal: ctrl.signal });
+  } catch (e) {
+    throw new ApiError(
+      e.name === "AbortError" ? "timeout" : (isFileOrigin() ? "file" : "cors"), path);
+  } finally { clearTimeout(timer); }
+
+  if (!res.ok) throw new ApiError("http", String(res.status));
+  const data = await res.json();
+  cache.set(url, { at: Date.now(), data });
+  return data;
+}
+
+async function fdGet(path) {
+  const url = `${CONFIG.fdBase}${path}`;
+  const hit = cache.get(url);
+  if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.data;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CONFIG.timeout);
+  let res;
+  try {
+    res = await fetch(url, { signal: ctrl.signal, headers: { "X-Auth-Token": CONFIG.fdKey } });
+  } catch (e) {
+    throw new ApiError(
+      e.name === "AbortError" ? "timeout" : (isFileOrigin() ? "file" : "cors"), path);
+  } finally { clearTimeout(timer); }
+
+  if (res.status === 400 || res.status === 403) throw new ApiError("key", String(res.status));
+  if (res.status === 429) throw new ApiError("rate", "429");
+  if (!res.ok) throw new ApiError("http", String(res.status));
+
+  const data = await res.json();
+  cache.set(url, { at: Date.now(), data });
+  return data;
+}
+
+// В API-Football сезон — один год: 2026-2027 → 2026
+const afSeason = (league) => String(league.season).slice(0, 4);
+
+/* Бесплатный тариф API-Football ограничен по доступным сезонам: текущий
+   он обычно не отдаёт. Поэтому шагаем от свежего к старому, пока не придут
+   данные, и запоминаем найденный год — чтобы не тратить запросы повторно. */
+const afSeasonCache = new Map();
+
+async function afResolveSeason(league) {
+  const want = Number(afSeason(league));
+  const key = String(league.afId);
+  if (afSeasonCache.has(key)) {
+    const got = afSeasonCache.get(key);
+    state.seasonShift = got === want ? null : got;
+    return got;
+  }
+  for (let y = want; y >= want - 3; y--) {
+    try {
+      const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&last=1`);
+      if ((d.response || []).length) {
+        afSeasonCache.set(key, y);
+        state.seasonShift = y === want ? null : y;
+        return y;
+      }
+    } catch (e) {
+      if (e.kind === "key" || e.kind === "rate") throw e;   // дальше пробовать бессмысленно
+    }
+  }
+  afSeasonCache.set(key, want);
+  state.seasonShift = null;
+  return want;
+}
+
+function normalizeEvent(ev, sport, league) {
+  const date = parseDate(ev);
+  const hs = ev.intHomeScore, as = ev.intAwayScore;
+  const hasScore = hs !== null && hs !== "" && hs !== undefined &&
+                   as !== null && as !== "" && as !== undefined;
+  const status = String(ev.strStatus || "").toUpperCase();
+
+  return {
+    id: ev.idEvent,
+    title: ev.strEvent || "",
+    home: ev.strHomeTeam || "",
+    away: ev.strAwayTeam || "",
+    homeBadge: ev.strHomeTeamBadge || "",
+    awayBadge: ev.strAwayTeamBadge || "",
+    homeScore: hasScore ? Number(hs) : null,
+    awayScore: hasScore ? Number(as) : null,
+    stage: stageFromTSDB(ev.intRound, sport.id, league.id),
+    venue: ev.strVenue || "",
+    date,
+    ts: date ? date.getTime() : 0,
+    live: ["1H", "2H", "HT", "ET", "P", "BT"].includes(status),
+    finished: hasScore || ["FT", "AET", "PEN"].includes(status)
+  };
+}
+
+function normalizeAF(f) {
+  const date = f.fixture?.date ? new Date(f.fixture.date) : null;
+  const short = f.fixture?.status?.short || "";
+  const hs = f.goals?.home, as = f.goals?.away;
+  const hasScore = hs !== null && hs !== undefined && as !== null && as !== undefined;
+
+  return {
+    id: String(f.fixture?.id ?? ""),
+    title: `${f.teams?.home?.name || ""} - ${f.teams?.away?.name || ""}`,
+    home: f.teams?.home?.name || "",
+    away: f.teams?.away?.name || "",
+    homeBadge: f.teams?.home?.logo || "",
+    awayBadge: f.teams?.away?.logo || "",
+    homeScore: hasScore ? hs : null,
+    awayScore: hasScore ? as : null,
+    stage: stageFromAF(f.league?.round),
+    venue: f.fixture?.venue?.name || "",
+    date,
+    ts: date ? date.getTime() : 0,
+    live: ["1H", "2H", "HT", "ET", "P", "LIVE"].includes(short),
+    finished: ["FT", "AET", "PEN"].includes(short)
+  };
+}
+
+/* --- Стратегия для бесплатного ключа TheSportsDB ---
+   Замеры живых ответов:
+     eventspastleague / eventsnextleague  -> 1 матч
+     eventsround                          -> 5 матчей
+     eventsseason                         -> 15 матчей
+   Поэтому один дешёвый запрос определяет текущий тур,
+   а сами матчи забираем турами — это в 15 раз больше данных. */
+
+async function tsdbAnchor(league) {
+  const d = await getJSON(`eventspastleague.php?id=${league.id}`);
+  const e = (d.events || [])[0];
+  if (!e) throw new ApiError("empty", "eventspastleague");
+  return { round: Number(e.intRound) || 1, season: e.strSeason || league.season };
+}
+
+const windowCache = new Map();
+
+// Окно из трёх туров вокруг текущего
+async function tsdbWindow(league, sport) {
+  const key = `${league.id}:w`;
+  const hit = windowCache.get(key);
+  if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.items;
+
+  const a = await tsdbAnchor(league);
+  const rounds = [a.round - 1, a.round, a.round + 1].filter((r) => r >= 1 && r <= 60);
+  const chunks = await Promise.allSettled(
+    rounds.map((r) => getJSON(`eventsround.php?id=${league.id}&r=${r}&s=${a.season}`)));
+
+  const raw = [];
+  for (const c of chunks) if (c.status === "fulfilled") raw.push(...(c.value.events || []));
+  if (!raw.length) throw new ApiError("empty", "eventsround");
+
+  const seen = new Set();
+  const items = raw
+    .filter((e) => seen.has(e.idEvent) ? false : (seen.add(e.idEvent), true))
+    .map((e) => normalizeEvent(e, sport, league));
+
+  windowCache.set(key, { at: Date.now(), items });
+  return items;
+}
+
+// UFC и Формула-1: туров нет, зато сезон целиком даёт 15 событий вместо одного
+async function tsdbSeason(league, sport) {
+  const key = `${league.id}:s`;
+  const hit = windowCache.get(key);
+  if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.items;
+
+  const d = await getJSON(`eventsseason.php?id=${league.id}&s=${league.season}`);
+  const raw = d.events || [];
+  if (!raw.length) throw new ApiError("empty", "eventsseason");
+  const items = raw.map((e) => normalizeEvent(e, sport, league));
+  windowCache.set(key, { at: Date.now(), items });
+  return items;
+}
+
+const isPast = (m) => m.finished || (m.ts && m.ts < Date.now());
+
+async function loadResults(league, sport) {
+  if (useApiFootball(sport)) {
+    const y = await afResolveSeason(league);
+    const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&last=20`);
+    return (d.response || []).map(normalizeAF).sort((a, b) => b.ts - a.ts);
+  }
+  const all = sport.kind === "event"
+    ? await tsdbSeason(league, sport)
+    : await tsdbWindow(league, sport);
+  const past = all.filter(isPast).sort((a, b) => b.ts - a.ts);
+  return past.length ? past : all.sort((a, b) => b.ts - a.ts);
+}
+
+async function loadSchedule(league, sport) {
+  if (useApiFootball(sport)) {
+    const y = await afResolveSeason(league);
+    const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&next=20`);
+    return (d.response || []).map(normalizeAF).sort((a, b) => a.ts - b.ts);
+  }
+  const all = sport.kind === "event"
+    ? await tsdbSeason(league, sport)
+    : await tsdbWindow(league, sport);
+  const next = all.filter((m) => !isPast(m)).sort((a, b) => a.ts - b.ts);
+  return next.length ? next : all.sort((a, b) => a.ts - b.ts);
+}
+
+// Все матчи одного тура целиком
+async function loadRound(league, sport, round) {
+  if (useApiFootball(sport)) {
+    const r = league.id === "4480" ? `League Stage - ${round}` : `Regular Season - ${round}`;
+    const y = await afResolveSeason(league);
+    const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&round=${encodeURIComponent(r)}`);
+    return (d.response || []).map(normalizeAF).sort((a, b) => a.ts - b.ts);
+  }
+  const data = await getJSON(`eventsround.php?id=${league.id}&r=${round}&s=${league.season}`);
+  return (data.events || []).map((e) => normalizeEvent(e, sport, league)).sort((a, b) => a.ts - b.ts);
+}
+
+// Матчи конкретной даты
+async function loadDay(league, sport, date) {
+  const iso = isoKey(date);
+  if (useApiFootball(sport)) {
+    const y = await afResolveSeason(league);
+    const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&date=${iso}`);
+    return (d.response || []).map(normalizeAF).sort((a, b) => a.ts - b.ts);
+  }
+  const data = await getJSON(`eventsday.php?d=${iso}&l=${league.id}`);
+  return (data.events || []).map((e) => normalizeEvent(e, sport, league)).sort((a, b) => a.ts - b.ts);
+}
+
+// Бомбардиры и ассистенты. У TheSportsDB такого метода нет —
+// работает только на API-Football.
+async function loadPlayers(league, sport, kind) {
+  if (!useApiFootball(sport)) throw new Error("no-provider");
+  const path = kind === "assists" ? "topassists" : "topscorers";
+  const y = await afResolveSeason(league);
+  const d = await afGet(`/players/${path}?league=${league.afId}&season=${y}`);
+  return (d.response || []).map((r, i) => {
+    const st = r.statistics?.[0] || {};
+    return {
+      rank: i + 1,
+      name: r.player?.name || "",
+      photo: r.player?.photo || "",
+      team: st.team?.name || "",
+      teamBadge: st.team?.logo || "",
+      games: st.games?.appearences || 0,
+      goals: st.goals?.total || 0,
+      assists: st.goals?.assists || 0,
+      penalty: st.penalty?.scored || 0
+    };
+  });
+}
+
+// Результаты + расписание в одном списке. Нужны, чтобы отметить точками
+// дни с матчами и чтобы было чем подстраховать тур и календарь.
+async function loadAround(league, sport) {
+  const [past, next] = await Promise.allSettled([
+    loadResults(league, sport),
+    loadSchedule(league, sport)
+  ]);
+  const all = []
+    .concat(past.status === "fulfilled" ? past.value : [])
+    .concat(next.status === "fulfilled" ? next.value : []);
+  // убираем дубли по id
+  const seen = new Set();
+  return all.filter((m) => (m.id && seen.has(m.id)) ? false : (seen.add(m.id), true));
+}
+
+/* Таблицу берём из лучшего доступного источника. Порядок важен:
+   football-data.org отдаёт таблицу целиком, API-Football тоже,
+   а TheSportsDB на бесплатном ключе обрезает её до пяти строк. */
+
+// football-data.org: полная таблица, форма приходит строкой "W,D,L,W,W"
+async function fdTable(league) {
+  const d = await fdGet(`/competitions/${league.fdCode}/standings`);
+  const blocks = (d.standings || []).filter((b) => b.type === "TOTAL");
+  if (!blocks.length) throw new ApiError("empty", "standings");
+
+  const rows = [];
+  for (const b of blocks) {
+    for (const r of (b.table || [])) {
+      rows.push({
+        rank:   r.position,
+        team:   r.team?.shortName || r.team?.name || "",
+        badge:  r.team?.crest || "",
+        played: r.playedGames || 0,
+        win:    r.won || 0,
+        draw:   r.draw || 0,
+        loss:   r.lost || 0,
+        gf:     r.goalsFor || 0,
+        ga:     r.goalsAgainst || 0,
+        gd:     Number(r.goalDifference) || 0,
+        points: r.points || 0,
+        form:   r.form || "",
+        group:  b.group || null,
+        zone:   null              // источник зоны не присылает, посчитаем ниже
+      });
+    }
+  }
+  // Зоны считаем внутри каждой группы отдельно
+  const perGroup = new Map();
+  for (const r of rows) perGroup.set(r.group, (perGroup.get(r.group) || 0) + 1);
+  for (const r of rows) r.zone = zoneByPosition(league.id, r.rank, perGroup.get(r.group));
+
+  state.tableSource = "football-data.org";
+  return rows;
+}
+
+// Места в ответе нет — порядок массива и есть порядок в таблице
+async function olTable(league) {
+  const year = afSeason(league);
+  const raw = await olGet(`/getbltable/${league.olCode}/${year}`);
+  if (!Array.isArray(raw) || !raw.length) throw new ApiError("empty", "getbltable");
+
+  const rows = raw.map((r, i) => ({
+    rank:   i + 1,
+    team:   r.teamName || r.shortName || "",
+    badge:  r.teamIconUrl || "",
+    played: r.matches || 0,
+    win:    r.won || 0,
+    draw:   r.draw || 0,
+    loss:   r.lost || 0,
+    gf:     r.goals || 0,
+    ga:     r.opponentGoals || 0,
+    gd:     Number(r.goalDiff) || 0,
+    points: r.points || 0,
+    form:   "",                 // формы этот источник не отдаёт
+    group:  null,
+    zone:   null
+  }));
+  for (const r of rows) r.zone = zoneByPosition(league.id, r.rank, rows.length);
+
+  state.tableSource = "OpenLigaDB";
+  return rows;
+}
+
+async function loadTable(league, sport) {
+  if (CONFIG.fdKey && league.fdCode) {
+    try { return await fdTable(league); }
+    catch (e) { if (e.kind === "key") throw e; /* иначе пробуем дальше */ }
+  }
+
+  if (useApiFootball(sport)) {
+    const y = await afResolveSeason(league);
+    const d = await afGet(`/standings?league=${league.afId}&season=${y}`);
+    const rows = d.response?.[0]?.league?.standings?.[0] || [];
+    state.tableSource = "API-Football";
+    return rows.map((r) => ({
+      rank: r.rank, team: r.team?.name || "", badge: r.team?.logo || "",
+      played: r.all?.played || 0, win: r.all?.win || 0,
+      draw: r.all?.draw || 0, loss: r.all?.lose || 0,
+      gf: r.all?.goals?.for || 0, ga: r.all?.goals?.against || 0,
+      gd: Number(r.goalsDiff) || 0, points: r.points || 0,
+      form: r.form || "", group: null,
+      zone: zoneOf(r.description) || zoneByPosition(league.id, r.rank, rows.length)
+    }));
+  }
+
+  // Ключей нет, но для немецких лиг полная таблица доступна и так
+  if (league.olCode) {
+    try { return await olTable(league); } catch (e) { /* дальше — запасной вариант */ }
+  }
+
+  const data = await getJSON(`lookuptable.php?l=${league.id}&s=${league.season}`);
+  const raw = data.table || [];
+  state.tableSource = "TheSportsDB";
+  return raw.map((r) => ({
+    rank:   Number(r.intRank),
+    team:   r.strTeam,
+    badge:  r.strBadge || r.strTeamBadge || "",
+    played: Number(r.intPlayed) || 0,
+    win:    Number(r.intWin) || 0,
+    draw:   Number(r.intDraw) || 0,
+    loss:   Number(r.intLoss) || 0,
+    gf:     Number(r.intGoalsFor) || 0,
+    ga:     Number(r.intGoalsAgainst) || 0,
+    gd:     Number(r.intGoalDifference ?? (r.intGoalsFor - r.intGoalsAgainst)) || 0,
+    points: Number(r.intPoints) || 0,
+    form:   r.strForm || "",
+    group:  r.strGroup || null,
+    zone:   zoneOf(r.strDescription)
+  }));
+}
+
+/* ============================================================
+   7. ДЕМО-ДАННЫЕ
+   Показываются, только когда API недоступен. Имена клубов взяты
+   в том виде, в каком их отдаёт API, — чтобы демо не отличалось
+   от реального результата.
+   ============================================================ */
+
+// Полные составы лиг — чтобы демо-таблица выглядела как настоящая
+const DEMO_TEAMS = {
+  "4328": ["Arsenal","Liverpool","Manchester City","Chelsea","Tottenham","Newcastle","Aston Villa",
+           "Manchester United","Brighton","West Ham","Crystal Palace","Fulham","Brentford","Everton",
+           "Nottingham Forest","Bournemouth","Wolves","Leeds","Burnley","Sunderland"],
+  "4335": ["Real Madrid","Barcelona","Atletico Madrid","Athletic Club","Villarreal","Real Betis","Sevilla",
+           "Valencia","Real Sociedad","Girona","Celta Vigo","Osasuna","Rayo Vallecano","Getafe","Mallorca",
+           "Alaves","Espanyol","Elche","Levante","Oviedo"],
+  "4332": ["Inter","AC Milan","Juventus","Napoli","Atalanta","AS Roma","Lazio","Fiorentina","Bologna",
+           "Torino","Udinese","Genoa","Como","Cagliari","Parma","Lecce","Verona","Sassuolo","Pisa","Cremonese"],
+  "4331": ["Bayern Munich","Bayer Leverkusen","RB Leipzig","VfB Stuttgart","Borussia Dortmund",
+           "Eintracht Frankfurt","Wolfsburg","Freiburg","Hoffenheim","Werder Bremen","Mainz","Augsburg",
+           "Borussia Monchengladbach","Union Berlin","St. Pauli","Heidenheim","Koln","Hamburger SV"],
+  "4334": ["Paris Saint Germain","Monaco","Marseille","Lille","Nice","Lyon","Lens","Brest","Strasbourg",
+           "Rennes","Toulouse","Nantes","Auxerre","Angers","Le Havre","Metz","Lorient","Paris FC"],
+  // Общий этап Лиги чемпионов — 36 команд
+  "4480": ["Real Madrid","Manchester City","Bayern Munich","Paris Saint Germain","Inter","Barcelona",
+           "Liverpool","Arsenal","Bayer Leverkusen","Atletico Madrid","Atalanta","Juventus","Benfica",
+           "Borussia Dortmund","AC Milan","Chelsea","Tottenham","Napoli","PSV","Sporting CP","Ajax",
+           "Club Brugge","Feyenoord","Shakhtar Donetsk","Celtic","Galatasaray","Olympiacos","Bodo/Glimt",
+           "Slavia Praha","Union Saint-Gilloise","Qarabag","Kairat","Copenhagen","Marseille","Newcastle","Monaco"]
+};
+
+/* Сколько верхних мест идёт в еврокубки и сколько нижних вылетает.
+   Нужно там, где источник не присылает описание зоны (football-data.org).
+   Правила приблизительные: реальное число мест зависит от коэффициента
+   страны и итогов кубков, поэтому источник с описанием всегда в приоритете. */
+const ZONES = {
+  "4328": { ucl: 5, uel: 6, uecl: 7, rel: 3 },
+  "4335": { ucl: 5, uel: 6, uecl: 7, rel: 3 },
+  "4332": { ucl: 5, uel: 6, uecl: 7, rel: 3 },
+  "4331": { ucl: 4, uel: 5, uecl: 6, rel: 2 },
+  "4334": { ucl: 4, uel: 5, uecl: 6, rel: 2 },
+  "4480": { ucl: 8, uel: 24, uecl: 24, rel: 0 }
+};
+
+// Демо-игроки. Это заглушка для вёрстки, а не настоящая статистика.
+const DEMO_PLAYERS = {
+  "4328": [["Haaland","Manchester City"],["Salah","Liverpool"],["Saka","Arsenal"],["Isak","Liverpool"],
+           ["Palmer","Chelsea"],["Watkins","Aston Villa"],["Son","Tottenham"],["Bruno Fernandes","Manchester United"],
+           ["Wood","Nottingham Forest"],["Mbeumo","Manchester United"],["Semenyo","Bournemouth"],["Foden","Manchester City"]],
+  "4335": [["Mbappe","Real Madrid"],["Lewandowski","Barcelona"],["Julian Alvarez","Atletico Madrid"],
+           ["Raphinha","Barcelona"],["Vinicius Junior","Real Madrid"],["Yamal","Barcelona"],
+           ["Oyarzabal","Real Sociedad"],["Budimir","Osasuna"],["Sorloth","Atletico Madrid"],
+           ["Ferran Torres","Barcelona"],["Bellingham","Real Madrid"],["Griezmann","Atletico Madrid"]],
+  "4332": [["Lautaro Martinez","Inter"],["Retegui","Atalanta"],["Vlahovic","Juventus"],["Thuram","Inter"],
+           ["Kean","Fiorentina"],["Pulisic","AC Milan"],["Orsolini","Bologna"],["Dybala","AS Roma"],
+           ["Zaccagni","Lazio"],["Leao","AC Milan"],["Castellanos","Lazio"],["Lookman","Atalanta"]],
+  "4331": [["Kane","Bayern Munich"],["Guirassy","Borussia Dortmund"],["Openda","RB Leipzig"],
+           ["Undav","VfB Stuttgart"],["Musiala","Bayern Munich"],["Schick","Bayer Leverkusen"],
+           ["Burkardt","Eintracht Frankfurt"],["Kleindienst","Borussia Monchengladbach"],
+           ["Ducksch","Werder Bremen"],["Olise","Bayern Munich"],["Grimaldo","Bayer Leverkusen"],["Sesko","RB Leipzig"]],
+  "4334": [["Dembele","Paris Saint Germain"],["Greenwood","Marseille"],["Barcola","Paris Saint Germain"],
+           ["David","Lille"],["Doue","Paris Saint Germain"],["Balogun","Monaco"],
+           ["Kvaratskhelia","Paris Saint Germain"],["Akliouche","Monaco"],["Thauvin","Lens"],
+           ["Fofana","Monaco"],["Gouiri","Marseille"],["Cherki","Lyon"]],
+  "4480": [["Haaland","Manchester City"],["Mbappe","Real Madrid"],["Kane","Bayern Munich"],
+           ["Lewandowski","Barcelona"],["Salah","Liverpool"],["Vinicius Junior","Real Madrid"],
+           ["Yamal","Barcelona"],["Musiala","Bayern Munich"],["Lautaro Martinez","Inter"],
+           ["Dembele","Paris Saint Germain"],["Saka","Arsenal"],["Guirassy","Borussia Dortmund"]]
+};
+
+const DEMO_F1 = ["Bahrain Grand Prix","Saudi Arabian Grand Prix","Australian Grand Prix","Japanese Grand Prix",
+  "Miami Grand Prix","Monaco Grand Prix","Spanish Grand Prix","Canadian Grand Prix"];
+const DEMO_F1_CIRCUITS = ["Sakhir","Jeddah","Albert Park","Suzuka","Miami Gardens","Monte Carlo","Barcelona","Gilles Villeneuve"];
+const DEMO_F1_WINNERS = ["Verstappen","Norris","Leclerc","Piastri","Russell","Hamilton"];
+
+const DEMO_UFC = [
+  ["Makhachev","Tsarukyan"],["Pereira","Ankalaev"],["Jones","Aspinall"],["Topuria","Holloway"],
+  ["Du Plessis","Strickland"],["O'Malley","Dvalishvili"],["Shevchenko","Grasso"],["Gaethje","Pimblett"]
+];
+
+function seeded(n) { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); }
+
+function demoDate(offsetDays, hour) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  d.setHours(hour, offsetDays % 2 ? 30 : 0, 0, 0);
+  return d;
+}
+
+function demoMatches(leagueId, past) {
+  const teams = DEMO_TEAMS[leagueId] || DEMO_TEAMS["4328"];
+  const ucl = leagueId === "4480";
+  const out = [];
+  for (let i = 0; i < 10; i++) {
+    const home = teams[i % teams.length];
+    const away = teams[(i + 3) % teams.length];
+    if (home === away) continue;
+    const dayOffset = Math.floor(i / 3) + 1;
+    const date = demoDate(past ? -dayOffset : dayOffset + 1, 17 + (i % 3) * 2);
+    // В конце августа ЛЧ ещё на стадии плей-офф раунда, общий этап впереди
+    const stage = ucl
+      ? (past ? { kind: "playoff" } : { kind: "leaguePhase", n: 1 })
+      : { kind: "matchday", n: past ? Math.max(1, 4 - dayOffset) : 4 + dayOffset };
+    out.push({
+      id: `demo-${leagueId}-${past ? "p" : "n"}-${i}`,
+      title: `${home} - ${away}`, home, away, homeBadge: "", awayBadge: "",
+      homeScore: past ? Math.floor(seeded(i + Number(leagueId)) * 4) : null,
+      awayScore: past ? Math.floor(seeded(i * 7 + Number(leagueId)) * 3) : null,
+      stage, venue: "", date, ts: date.getTime(), live: false, finished: past
+    });
+  }
+  return out.sort((a, b) => past ? b.ts - a.ts : a.ts - b.ts);
+}
+
+function demoF1(past) {
+  return DEMO_F1.map((name, i) => {
+    const date = demoDate(past ? -(i * 14 + 3) : i * 14 + 5, 16);
+    return {
+      id: `demo-f1-${past ? "p" : "n"}-${i}`,
+      title: name,
+      home: past ? DEMO_F1_WINNERS[i % DEMO_F1_WINNERS.length] : "", away: "",
+      homeBadge: "", awayBadge: "",
+      homeScore: past ? 1 : null, awayScore: past ? 0 : null,
+      stage: { kind: "f1", n: past ? 12 - i : 13 + i },
+      venue: DEMO_F1_CIRCUITS[i] || "",
+      date, ts: date.getTime(), live: false, finished: past
+    };
+  }).sort((a, b) => past ? b.ts - a.ts : a.ts - b.ts);
+}
+
+function demoUFC(past) {
+  return DEMO_UFC.map(([a, b], i) => {
+    const date = demoDate(past ? -(i * 7 + 2) : i * 7 + 4, 22);
+    return {
+      id: `demo-ufc-${past ? "p" : "n"}-${i}`,
+      title: `UFC ${past ? 320 - i : 328 + i}: ${a} vs ${b}`,
+      home: a, away: b, homeBadge: "", awayBadge: "",
+      homeScore: past ? (seeded(i) > .5 ? 1 : 0) : null,
+      awayScore: past ? (seeded(i) > .5 ? 0 : 1) : null,
+      stage: null, venue: "T-Mobile Arena, Las Vegas",
+      date, ts: date.getTime(), live: false, finished: past
+    };
+  }).sort((a, b) => past ? b.ts - a.ts : a.ts - b.ts);
+}
+
+// Полный тур: все команды разбиты на пары, матчи разнесены на два дня
+function demoRound(leagueId, n) {
+  const teams = DEMO_TEAMS[leagueId] || DEMO_TEAMS["4328"];
+  const half = Math.floor(teams.length / 2);
+  const shift = (n - 1) % Math.max(1, teams.length - 1);
+  const ucl = leagueId === "4480";
+  const out = [];
+
+  for (let i = 0; i < half; i++) {
+    const home = teams[i];
+    const away = teams[(teams.length - 1 - i + shift) % teams.length];
+    if (home === away) continue;
+    const dayShift = i < Math.ceil(half / 2) ? 0 : 1;
+    const date = demoDate(-(3 - dayShift), 17 + (i % 3) * 2);
+    const past = date.getTime() < Date.now();
+    out.push({
+      id: `demo-round-${leagueId}-${n}-${i}`,
+      title: `${home} - ${away}`, home, away, homeBadge: "", awayBadge: "",
+      homeScore: past ? Math.floor(seeded(i + n * 3) * 4) : null,
+      awayScore: past ? Math.floor(seeded(i * 5 + n) * 3) : null,
+      stage: { kind: ucl ? "leaguePhase" : "matchday", n },
+      venue: "", date, ts: date.getTime(), live: false, finished: past
+    });
+  }
+  return out.sort((a, b) => a.ts - b.ts);
+}
+
+function demoTable(leagueId) {
+  const teams = DEMO_TEAMS[leagueId] || DEMO_TEAMS["4328"];
+  const z = ZONES[leagueId] || ZONES["4328"];
+  const n = teams.length;
+  const played = 10;
+
+  // Сначала считаем показатели, места расставим после сортировки —
+  // иначе в таблице попадаются строки, где очков больше, чем у соседа сверху
+  const rows = teams.map((team, i) => {
+    const win = Math.max(0, Math.min(played, Math.round((n - i) / n * 8) - Math.floor(seeded(i) * 2)));
+    const draw = Math.min(played - win, Math.floor(seeded(i * 3) * 4));
+    const loss = played - win - draw;
+    const gf = win * 2 + draw + Math.floor(seeded(i * 5) * 6);
+    const ga = loss * 2 + Math.floor(seeded(i * 9) * 5);
+    return { team, badge: "", played, win, draw, loss, gf, ga,
+             gd: gf - ga, points: win * 3 + draw, seed: i };
+  });
+
+  rows.sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf);
+
+  return rows.map((r, i) => {
+    const rank = i + 1;
+    // Форма: чем выше место, тем чаще победы
+    const form = Array.from({ length: 5 }, (_, k) => {
+      const rnd = seeded(r.seed * 17 + k * 3);
+      const winChance = 0.75 - (i / n) * 0.55;
+      return rnd < winChance ? "W" : rnd < winChance + 0.22 ? "D" : "L";
+    }).join("");
+
+    const zone = rank <= z.ucl ? "ucl"
+      : rank <= z.uel ? "uel"
+      : rank <= z.uecl ? "uecl"
+      : (z.rel && rank > n - z.rel) ? "rel" : null;
+
+    return { ...r, rank, form, zone };
+  });
+}
+
+// Демо-статистика игроков: числа выдуманы, имена — заглушка для вёрстки
+function demoPlayers(leagueId, kind) {
+  const src = DEMO_PLAYERS[leagueId] || DEMO_PLAYERS["4328"];
+  // У ассистентов порядок другой — иначе список выглядит копией бомбардиров
+  const list = kind === "assists"
+    ? src.map((x, i) => [x, seeded(i * 23 + 5)]).sort((a, b) => a[1] - b[1]).map((x) => x[0])
+    : src;
+  return list.map(([name, team], i) => {
+    const base = kind === "assists" ? 11 : 15;
+    const primary = Math.max(1, base - i - Math.floor(seeded(i * 7) * 2));
+    const other = Math.max(0, Math.floor(primary * (kind === "assists" ? 0.7 : 0.45)) - Math.floor(seeded(i) * 2));
+    return {
+      rank: i + 1, name, photo: "", team, teamBadge: "",
+      games: 10 + Math.floor(seeded(i * 11) * 3),
+      goals: kind === "assists" ? other : primary,
+      assists: kind === "assists" ? primary : other,
+      penalty: Math.floor(seeded(i * 13) * 3)
+    };
+  });
+}
+
+function demoFor(sport, league, view) {
+  if (view === "table") return demoTable(league.id);
+  const past = view === "results";
+  if (sport.id === "f1") return demoF1(past);
+  if (sport.id === "ufc") return demoUFC(past);
+  return demoMatches(league.id, past);
+}
+
+/* ============================================================
+   8. ОТРИСОВКА
+   ============================================================ */
+
+function renderChrome() {
+  const L = t();
+  document.documentElement.lang = L.htmlLang;
+  $("#brand-name").textContent = L.brand;
+  $(".brand").setAttribute("aria-label", L.brand);
+  $("#brand-word").textContent = L.brand;
+  $("#tagline").textContent = L.tagline;
+  $("#footer-note").textContent = L.footerNote;
+  $("#refresh").title = L.refresh;
+  $("#refresh").setAttribute("aria-label", L.refresh);
+  $("#langsw").setAttribute("aria-label", L.langLabel);
+  const inp = $("#search");
+  inp.placeholder = L.searchPh;
+  inp.setAttribute("aria-label", L.searchPh);
+
+  $("#langsw").innerHTML = ["ru", "uz"].map((code) => `
+    <button data-lang="${code}" aria-pressed="${code === state.lang}">${code.toUpperCase()}</button>
+  `).join("");
+
+  $("#sportnav").innerHTML = SPORTS.map((s) => `
+    <button role="tab" data-sport="${s.id}"
+            aria-selected="${s.id === state.sport.id}">${esc(L.sport[s.id])}</button>
+  `).join("");
+
+  const box = $("#chips");
+  box.innerHTML = state.sport.leagues.length < 2
+    ? `<span class="chip chip--static">${esc(L.season)} ${esc(state.league.season)}</span>`
+    : state.sport.leagues.map((l) => `
+        <button class="chip" data-league="${l.id}"
+                aria-pressed="${l.id === state.league.id}">${esc(L.league[l.id] || l.id)}</button>
+      `).join("");
+
+  const viewName = (v) => (L.viewAlias?.[state.sport.id]?.[v]) || L.view[v];
+  $("#viewtabs").innerHTML = state.sport.views.map((v) => `
+    <button role="tab" data-view="${v}"
+            aria-selected="${v === state.view}">${esc(viewName(v))}</button>
+  `).join("");
+
+  $("#title").textContent = L.sport[state.sport.id];
+  $("#subtitle").textContent = L.sportSub[state.sport.id];
+  $("#eyebrow").textContent =
+    `${state.sport.leagues.length > 1 ? L.league[state.league.id] + " · " : ""}${viewName(state.view)}`;
+
+  $("#demobar").classList.toggle("show", state.usedDemo);
+  $("#demo-title").textContent = L.demoTitle;
+
+  const err = state.lastError;
+  const kind = err && err.kind && L.err[err.kind] ? err.kind : null;
+  if (kind) {
+    const extra = (kind === "http" && err.detail) ? ` ${err.detail}.` : "";
+    $("#demo-text").textContent = L.err[kind] + extra;
+    $("#demo-fix").textContent = L.errFix[kind];
+  } else {
+    $("#demo-text").textContent = L.demoText;
+    $("#demo-fix").textContent = "";
+  }
+}
+
+function badgeHTML(url, name) {
+  return url
+    ? `<img class="badge" src="${esc(url)}" alt="" loading="lazy" data-init="${esc(initials(name))}">`
+    : `<span class="badge-fallback" aria-hidden="true">${esc(initials(name))}</span>`;
+}
+
+document.addEventListener("error", (e) => {
+  const img = e.target;
+  if (img.tagName !== "IMG" || !(img.classList.contains("badge") || img.classList.contains("avatar"))) return;
+  const span = document.createElement("span");
+  span.className = "badge-fallback";
+  span.setAttribute("aria-hidden", "true");
+  span.textContent = img.dataset.init || "?";
+  img.replaceWith(span);
+}, true);
+
+// Левый рельс: номер тура крупно либо короткое название стадии
+function railHTML(m) {
+  const L = stageLabel(m.stage);
+  if (L && L.big !== undefined) return `<b>${esc(L.big)}</b>${esc(L.unit)}`;
+  if (L && L.short) return `<span class="stagetag" title="${esc(L.full)}">${esc(L.short)}</span>`;
+  return esc(fmtShort(m.date));
+}
+
+// Дата под пластиной: «пт, 28.08». Нужна, чтобы карточка читалась сама по
+// себе — во вкладке «Тур» матчи идут подряд за разные дни, и заголовка дня
+// над ними нет.
+function scoreDateHTML(d) {
+  if (!d) return "";
+  return `<span class="scoredate">${esc(t().dow[dowIndex(d)])}, ${esc(fmtShort(d))}</span>`;
+}
+
+function screenHTML(m, upcoming) {
+  let plate;
+  if (m.live) {
+    // идёт прямо сейчас — красный контур
+    plate = `<div class="screen screen--live">
+      <span class="num">${m.homeScore ?? 0}</span><span class="sep">:</span><span class="num">${m.awayScore ?? 0}</span>
+    </div>`;
+  } else if (!upcoming && m.homeScore !== null) {
+    // сыгран — счёт «отчеканен» в золоте
+    plate = `<div class="screen screen--final">
+      <span class="num">${m.homeScore}</span><span class="sep">:</span><span class="num">${m.awayScore}</span>
+    </div>`;
+  } else {
+    // ещё не сыгран — контур и время начала
+    plate = `<div class="screen"><span class="clock">${esc(fmtTime(m.date))}</span></div>`;
+  }
+  return `<div class="scorebox">${plate}${scoreDateHTML(m.date)}</div>`;
+}
+
+function matchHTML(m, upcoming) {
+  const L = stageLabel(m.stage);
+  const note = L && L.note ? L.note : null;
+  const foot = [];
+  if (m.live) foot.push(`<span class="tag tag--live"><span class="dot-live"></span>${esc(t().live)}</span>`);
+  if (note)   foot.push(`<span class="tag">${esc(note)}</span>`);
+  if (m.venue) foot.push(`<span class="tag">${esc(m.venue)}</span>`);
+
+  return `
+  <article class="match">
+    <div class="rail">${railHTML(m)}</div>
+    <div class="row">
+      <div class="side side--home">
+        <span class="name">${esc(clubName(m.home))}</span>
+        ${badgeHTML(m.homeBadge, m.home)}
+      </div>
+      ${screenHTML(m, upcoming)}
+      <div class="side side--away">
+        ${badgeHTML(m.awayBadge, m.away)}
+        <span class="name">${esc(clubName(m.away))}</span>
+      </div>
+    </div>
+    ${foot.length ? `<div class="foot">${foot.join("")}</div>` : ""}
+  </article>`;
+}
+
+function eventHTML(m, upcoming) {
+  const right = (!upcoming && m.homeScore !== null && m.home)
+    ? `<span class="tag">${esc(t().winner)}: <strong class="winner">${esc(m.homeScore > m.awayScore ? m.home : m.away)}</strong></span>`
+    : `<div class="screen"><span class="clock">${esc(fmtTime(m.date))}</span></div>`;
+
+  return `
+  <article class="event">
+    <div class="rail">${railHTML(m)}</div>
+    <div class="event-right">
+      <div style="min-width:0">
+        <div class="event-title">${esc(m.title || `${m.home} vs ${m.away}`)}</div>
+        <div class="event-sub">${esc(fmtDay(m.date))}${m.venue ? " · " + esc(m.venue) : ""}</div>
+      </div>
+      ${right}
+    </div>
+  </article>`;
+}
+
+function renderList(items, sport, upcoming, flat) {
+  if (!items.length) return notice(t().emptyTitle, t().emptyText);
+
+  if (sport.kind === "event") {
+    return `<div class="list">${items.map((m) => eventHTML(m, upcoming)).join("")}</div>`;
+  }
+
+  // Плоский список без заголовков дней — для календаря и для одного тура
+  if (flat) {
+    return `<div class="list">${items.map((m) => matchHTML(m, upcoming)).join("")}</div>`;
+  }
+
+  const groups = new Map();
+  for (const m of items) {
+    const k = dayKey(m.date);
+    if (!groups.has(k)) groups.set(k, { date: m.date, items: [] });
+    groups.get(k).items.push(m);
+  }
+
+  let html = `<div class="list">`;
+  for (const g of groups.values()) {
+    html += `<section class="daygroup"><h2 class="dayhead">${esc(fmtDay(g.date))}</h2>`;
+    for (const m of g.items) html += matchHTML(m, upcoming);
+    html += `</section>`;
+  }
+  return html + `</div>`;
+}
+
+// Пять последних матчей: В / Н / П
+function formHTML(form) {
+  const L = t();
+  const chars = String(form || "").toUpperCase().replace(/[^WDL]/g, "").slice(-5).split("");
+  if (!chars.length) return `<span class="form-empty">—</span>`;
+  return `<div class="form">${chars.map((c) =>
+    `<span class="f f--${c.toLowerCase()}" title="${esc(L.formWord[c])}">${esc(L.formLetter[c])}</span>`
+  ).join("")}</div>`;
+}
+
+function zoneLegendHTML(rows) {
+  const L = t();
+  const seen = [];
+  for (const r of rows) if (r.zone && !seen.includes(r.zone)) seen.push(r.zone);
+  if (!seen.length) return "";
+  return `<div class="legend">${seen.map((z) =>
+    `<span class="legend-item"><i class="legend-bar legend-bar--${z}"></i>${esc(L.zone[z] || z)}</span>`
+  ).join("")}</div>`;
+}
+
+function renderTable(rows) {
+  const L = t();
+  if (!rows.length) return notice(L.noTableTitle, L.noTableText);
+
+  let lastGroup = null;
+  const body = rows.map((r) => {
+    let head = "";
+    if (r.group && r.group !== lastGroup) {
+      lastGroup = r.group;
+      head = `<tr class="grouprow"><td colspan="10">${esc(r.group)}</td></tr>`;
+    }
+    return head + `<tr${r.zone ? ` class="z-${r.zone}"` : ""}>
+      <td><span class="pos${r.zone ? " pos--" + r.zone : ""}">${r.rank}</span></td>
+      <td><div class="tteam">${badgeHTML(r.badge, r.team)}<span>${esc(clubName(r.team))}</span></div></td>
+      <td>${r.played}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td>
+      <td>${r.gf}:${r.ga}</td>
+      <td>${r.gd > 0 ? "+" : ""}${r.gd}</td>
+      <td class="pts">${r.points}</td>
+      <td class="td-form">${formHTML(r.form)}</td>
+    </tr>`;
+  }).join("");
+
+  const th = (k) => `<th title="${esc(L.thTitle[k] || "")}">${esc(L.th[k])}</th>`;
+
+  // На бесплатном ключе TheSportsDB таблица обрезана до 5 строк — говорим об этом прямо
+  const capped = (!state.usedDemo && state.tableSource === "TheSportsDB" && rows.length <= 5)
+    ? `<p class="hint">${esc(L.tableCapped)}<br><span class="hint-fix">${esc(L.tableFix)}</span></p>`
+    : seasonHintHTML();
+
+  const src = (!state.usedDemo && state.tableSource)
+    ? `<p class="srcline">${esc(L.source)}: ${esc(state.tableSource)} · ${rows.length} ${esc(L.rows)}</p>` : "";
+
+  return `<div class="tablewrap"><table>
+    <thead><tr>
+      <th>${esc(L.th.pos)}</th><th>${esc(L.th.team)}</th>
+      ${th("p")}${th("w")}${th("d")}${th("l")}${th("goals")}${th("gd")}${th("pts")}
+      <th title="${esc(L.thFormTitle)}">${esc(L.thForm)}</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>${zoneLegendHTML(rows)}${src}${capped}`;
+}
+
+/* ---------- Бомбардиры и ассистенты ---------- */
+
+function playerTabsHTML() {
+  const L = t();
+  return `<div class="ptabs" role="group">
+    <button data-pk="goals"   aria-pressed="${state.playerKind === "goals"}">${esc(L.tabGoals)}</button>
+    <button data-pk="assists" aria-pressed="${state.playerKind === "assists"}">${esc(L.tabAssists)}</button>
+  </div>`;
+}
+
+function renderPlayers(rows) {
+  const L = t();
+  if (!rows.length) return playerTabsHTML() + notice(L.noPlayersTitle, L.noPlayersText);
+
+  const goalsFirst = state.playerKind === "goals";
+  const body = rows.map((r) => `<tr>
+      <td><span class="pos${r.rank <= 3 ? " pos--top" : ""}">${r.rank}</span></td>
+      <td class="td-player">
+        <div class="tteam">
+          ${r.photo ? `<img class="avatar" src="${esc(r.photo)}" alt="" loading="lazy" data-init="${esc(initials(r.name))}">`
+                    : `<span class="badge-fallback" aria-hidden="true">${esc(initials(r.name))}</span>`}
+          <span>${esc(r.name)}</span>
+        </div>
+      </td>
+      <td class="td-club">${esc(clubName(r.team))}</td>
+      <td>${r.games}</td>
+      <td class="${goalsFirst ? "pts" : ""}">${r.goals}</td>
+      <td class="${goalsFirst ? "" : "pts"}">${r.assists}</td>
+      <td>${r.penalty}</td>
+    </tr>`).join("");
+
+  const hint = CONFIG.provider !== "apifootball"
+    ? `<p class="hint">${esc(L.playersNeedAf)}</p>`
+    : seasonHintHTML();
+
+  return playerTabsHTML() + `<div class="tablewrap"><table class="ptable">
+    <thead><tr>
+      <th>${esc(L.th.pos)}</th><th>${esc(L.thPlayer)}</th><th>${esc(L.thClub)}</th>
+      <th title="${esc(L.thTitle.p)}">${esc(L.th.p)}</th>
+      <th title="${esc(L.thGoalsTitle)}">${esc(L.thGoals)}</th>
+      <th title="${esc(L.thAssistsTitle)}">${esc(L.thAssists)}</th>
+      <th title="${esc(L.thPenTitle)}">${esc(L.thPen)}</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>` + hint;
+}
+
+/* ---------- Навигация по турам ---------- */
+
+function roundNavHTML(n) {
+  const L = t();
+  const label = L.stage.matchday(n);
+  return `<div class="roundnav">
+    <button data-round="prev" aria-label="${esc(L.roundPrev)}">‹</button>
+    <span class="roundnav-title">${esc(label.full)}</span>
+    <button data-round="next" aria-label="${esc(L.roundNext)}">›</button>
+  </div>`;
+}
+
+/* ---------- Календарь ---------- */
+
+function calendarHTML() {
+  const L = t();
+  const month = state.calMonth;
+  const first = startOfMonth(month);
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const lead = dowIndex(first);              // пустые клетки до 1-го числа
+  const today = new Date();
+
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += `<span class="cal-cell cal-cell--empty"></span>`;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(month.getFullYear(), month.getMonth(), day);
+    const iso = isoKey(d);
+    const has = state.dayIndex.get(iso)?.size || 0;
+    const cls = [
+      "cal-cell",
+      sameDay(d, state.calDay) ? "is-selected" : "",
+      sameDay(d, today) ? "is-today" : "",
+      has ? "has-games" : ""
+    ].filter(Boolean).join(" ");
+    cells += `<button class="${cls}" data-day="${iso}"${has ? ` title="${has}"` : ""}>` +
+             `${day}<i class="cal-dot" aria-hidden="true"></i></button>`;
+  }
+
+  const dows = L.dow.map((n) => `<span class="cal-dow">${esc(n)}</span>`).join("");
+
+  return `<div class="cal">
+    <div class="cal-head">
+      <button class="cal-nav" data-month="prev" aria-label="${esc(L.monthPrev)}">‹</button>
+      <span class="cal-title">${esc(fmtMonth(month))}</span>
+      <button class="cal-nav" data-month="next" aria-label="${esc(L.monthNext)}">›</button>
+    </div>
+    <div class="cal-grid">${dows}${cells}</div>
+  </div>`;
+}
+
+// Если ключу доступен не текущий сезон — говорим об этом прямо,
+// чтобы старые цифры не выглядели свежими
+function seasonHintHTML() {
+  if (!state.seasonShift) return "";
+  const y = state.seasonShift;
+  return `<p class="hint">${esc(t().seasonOld)} ${y}/${y + 1}.</p>`;
+}
+
+function notice(title, text, retry) {
+  return `<div class="list"><div class="notice">
+    <b>${esc(title)}</b>${esc(text)}
+    ${retry ? `<br><button data-retry>${esc(t().retry)}</button>` : ""}
+  </div></div>`;
+}
+
+const skeleton = () => `<div class="list">${'<div class="skel"></div>'.repeat(6)}</div>`;
+
+/* ============================================================
+   9. КОНТРОЛЛЕР
+   ============================================================ */
+
+let loadToken = 0;
+
+// Индекс «в какие дни есть матчи» — нужен для точек в календаре
+function indexDays(items) {
+  for (const m of items) {
+    if (!m.date) continue;
+    const k = isoKey(m.date);
+    if (!state.dayIndex.has(k)) state.dayIndex.set(k, new Set());
+    state.dayIndex.get(k).add(m.id);
+  }
+}
+
+// Текущий тур — тот, к которому относится ближайший к сегодня матч
+function guessRound(items) {
+  const now = Date.now();
+  let best = null, bestDist = Infinity;
+  for (const m of items) {
+    if (!m.stage || (m.stage.kind !== "matchday" && m.stage.kind !== "leaguePhase")) continue;
+    const dist = Math.abs(m.ts - now);
+    if (dist < bestDist) { bestDist = dist; best = m.stage.n; }
+  }
+  return best ?? 1;
+}
+
+async function load() {
+  const token = ++loadToken;
+  const { sport, league, view } = state;
+
+  state.lastError = null;
+  renderChrome();
+  $("#content").innerHTML = skeleton();
+
+  try {
+    if (view === "players")   await viewPlayers(token);
+    else if (view === "round") await viewRound(token);
+    else if (view === "cal")  await viewCalendar(token);
+    else if (view === "table") await viewTable(token);
+    else                      await viewList(token);
+  } catch (err) {
+    if (token === loadToken) $("#content").innerHTML = notice(t().emptyTitle, t().emptyText, true);
+  }
+}
+
+const done = (token) => token === loadToken;
+
+function finish(token, failed, html) {
+  if (!done(token)) return false;
+  state.usedDemo = failed;
+  renderChrome();
+  $("#content").innerHTML = html;
+  return true;
+}
+
+/* ---------- Результаты и расписание ---------- */
+
+async function viewList(token) {
+  const { sport, league, view } = state;
+  let data, failed = false;
+  try {
+    data = view === "results" ? await loadResults(league, sport) : await loadSchedule(league, sport);
+    if (!data || !data.length) throw new Error("empty");
+    indexDays(data);
+  } catch (e) {
+    failed = true;
+    state.lastError = e;
+    data = demoFor(sport, league, view);
+  }
+
+  const q = state.query.trim().toLowerCase();
+  const filtered = q
+    ? data.filter((m) => `${m.home} ${m.away} ${m.title} ${clubName(m.home)} ${clubName(m.away)}`
+        .toLowerCase().includes(q))
+    : data;
+
+  finish(token, failed, renderList(filtered, sport, view !== "results"));
+}
+
+/* ---------- Турнирная таблица ---------- */
+
+async function viewTable(token) {
+  const { sport, league } = state;
+  let rows = [], failed = false;
+  try {
+    rows = await loadTable(league, sport);
+  } catch (e) {
+    failed = true;
+    state.lastError = e;
+    rows = demoTable(league.id);
+  }
+  finish(token, failed, renderTable(rows));
+}
+
+/* ---------- Бомбардиры и ассистенты ---------- */
+
+async function viewPlayers(token) {
+  const { sport, league } = state;
+  let rows = [], failed = false;
+  try {
+    rows = await loadPlayers(league, sport, state.playerKind);
+    if (!rows.length) throw new Error("empty");
+  } catch (e) {
+    failed = true;
+    state.lastError = e;
+    rows = demoPlayers(league.id, state.playerKind);
+  }
+  finish(token, failed, renderPlayers(rows));
+}
+
+/* ---------- Все матчи одного тура ---------- */
+
+async function viewRound(token) {
+  const { sport, league } = state;
+
+  // Первый заход: узнаём, какой тур сейчас актуален
+  if (state.round === null) {
+    let around = [];
+    try { around = await loadAround(league, sport); } catch (e) { /* подстрахуемся демо */ }
+    if (!done(token)) return;
+    if (!around.length) {
+      around = demoFor(sport, league, "results").concat(demoFor(sport, league, "schedule"));
+      demoLeagues.add(cacheKeyFor(league));
+      state.lastError = state.lastError || new ApiError("empty", "loadAround");
+    }
+    indexDays(around);
+    roundCache.set(cacheKeyFor(league), around);
+    state.round = guessRound(around);
+  }
+
+  const n = state.round;
+  let data = [], failed = false;
+  try {
+    data = await loadRound(league, sport, n);
+    if (!data.length) throw new Error("empty");
+    indexDays(data);
+  } catch (e) {
+    // Подстраховка: сначала из уже загруженных матчей, иначе — демо-тур целиком
+    const pool = roundCache.get(cacheKeyFor(league)) || [];
+    data = pool.filter((m) => m.stage && m.stage.n === n);
+    if (!data.length) { data = demoRound(league.id, n); failed = true; state.lastError = e; }
+    else failed = demoLeagues.has(cacheKeyFor(league));
+  }
+  if (!done(token)) return;
+
+  const body = data.length
+    ? renderList(data.sort((a, b) => a.ts - b.ts), sport, false, true)
+    : notice(t().noRoundTitle, t().noRoundText);
+
+  finish(token, failed, roundNavHTML(n) + body);
+}
+
+const roundCache = new Map();
+const demoLeagues = new Set();   // для каких лиг пул собран из демо-данных
+const cacheKeyFor = (league) => `${league.id}:${league.season}`;
+
+/* ---------- Календарь ---------- */
+
+async function viewCalendar(token) {
+  const { sport, league } = state;
+  if (!state.calDay) state.calDay = new Date();
+
+  // Подтягиваем ближайшие матчи, чтобы проставить точки на числах
+  const key = cacheKeyFor(league);
+  if (!roundCache.has(key)) {
+    try {
+      const around = await loadAround(league, sport);
+      if (!done(token)) return;
+      if (!around.length) throw new Error("empty");
+      indexDays(around);
+      roundCache.set(key, around);
+    } catch (e) {
+      state.lastError = e;
+      const demo = demoFor(sport, league, "results").concat(demoFor(sport, league, "schedule"));
+      indexDays(demo);
+      roundCache.set(key, demo);
+      demoLeagues.add(key);
+    }
+  }
+  let failed = demoLeagues.has(key);
+
+  // Матчи выбранного дня
+  let day = [];
+  try {
+    day = await loadDay(league, sport, state.calDay);
+  } catch (e) { /* дальше возьмём из локальных */ }
+  if (!done(token)) return;
+
+  if (!day.length) {
+    const pool = roundCache.get(key) || [];
+    day = pool.filter((m) => m.date && sameDay(m.date, state.calDay));
+  }
+  indexDays(day);
+
+  const head = `<h2 class="dayhead dayhead--cal">${esc(fmtDay(state.calDay))}${
+    sameDay(state.calDay, new Date()) ? ` · ${esc(t().today)}` : ""}</h2>`;
+
+  const body = day.length
+    ? renderList(day.sort((a, b) => a.ts - b.ts), sport, false, true)
+    : notice(t().noDayTitle, t().noDayText);
+
+  finish(token, failed, calendarHTML() + head + body);
+}
+
+function setLang(code) {
+  if (!I18N[code] || code === state.lang) return;
+  state.lang = code;
+  load();
+}
+
+function setSport(id) {
+  const sport = SPORTS.find((s) => s.id === id);
+  if (!sport || sport.id === state.sport.id) return;
+  state.sport = sport;
+  state.league = sport.leagues[0];
+  state.round = null;
+  state.dayIndex.clear();
+  roundCache.clear(); demoLeagues.clear();
+  if (!sport.views.includes(state.view)) state.view = sport.views[0];
+  load();
+}
+
+function setLeague(id) {
+  const league = state.sport.leagues.find((l) => l.id === id);
+  if (!league || league.id === state.league.id) return;
+  state.league = league;
+  state.round = null;
+  state.dayIndex.clear();
+  roundCache.clear(); demoLeagues.clear();
+  state.seasonShift = null;
+  load();
+}
+
+function setView(id) {
+  if (id === state.view) return;
+  state.view = id;
+  load();
+}
+
+$("#langsw").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-lang]"); if (b) setLang(b.dataset.lang);
+});
+$("#sportnav").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-sport]"); if (b) setSport(b.dataset.sport);
+});
+$("#chips").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-league]"); if (b) setLeague(b.dataset.league);
+});
+$("#viewtabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view);
+});
+$("#content").addEventListener("click", (e) => {
+  if (e.target.closest("[data-retry]")) { cache.clear(); load(); return; }
+
+  const pk = e.target.closest("[data-pk]");
+  if (pk) {
+    if (pk.dataset.pk !== state.playerKind) { state.playerKind = pk.dataset.pk; load(); }
+    return;
+  }
+
+  const rb = e.target.closest("[data-round]");
+  if (rb) {
+    const next = state.round + (rb.dataset.round === "next" ? 1 : -1);
+    if (next >= 1 && next <= 60) { state.round = next; load(); }
+    return;
+  }
+
+  const mb = e.target.closest("[data-month]");
+  if (mb) {
+    const d = state.calMonth;
+    state.calMonth = new Date(d.getFullYear(), d.getMonth() + (mb.dataset.month === "next" ? 1 : -1), 1);
+    load();
+    return;
+  }
+
+  const db = e.target.closest("[data-day]");
+  if (db) {
+    const [y, m, d] = db.dataset.day.split("-").map(Number);
+    state.calDay = new Date(y, m - 1, d);
+    load();
+  }
+});
+
+let searchTimer;
+$("#search").addEventListener("input", (e) => {
+  state.query = e.target.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(load, 220);
+});
+
+$("#refresh").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  cache.clear(); windowCache.clear();
+  btn.classList.add("is-busy");
+  await load();
+  btn.classList.remove("is-busy");
+});
+
+setInterval(() => {
+  if (!document.hidden && state.view !== "table") { cache.clear(); windowCache.clear(); load(); }
+}, 120_000);
+
+load();
+
+</script>
+</body>
+</html>

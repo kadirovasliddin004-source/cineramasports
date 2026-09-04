@@ -794,7 +794,7 @@ footer{
 const CONFIG = {
   // Источник для футбола: "thesportsdb" или "apifootball".
   // UFC и Формула-1 всегда идут через TheSportsDB.
-  provider: "thesportsdb",
+  provider: "apifootball",
 
   // --- TheSportsDB: работает сразу, ключ 123 бесплатный и общий ---
   apiKey: "123",
@@ -808,7 +808,7 @@ const CONFIG = {
   // --- football-data.org: полная таблица, бесплатно и навсегда ---
   // Ключ: football-data.org/client/register (10 запросов в минуту)
   fdKey: "4d2215a84b594969b7084fdf569f2c67",
-  fdBase: "https://native-stats.org/competition/CL/",
+  fdBase: "https://api.football-data.org/v4",
 
   cacheTtl: 60_000,
   timeout: 9_000

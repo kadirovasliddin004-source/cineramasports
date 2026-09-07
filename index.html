@@ -860,6 +860,9 @@ footer{
     <label>API-Football
       <input id="k-af" type="text" spellcheck="false" autocomplete="off" placeholder="ключ для игроков">
     </label>
+    <label id="k-pxlab">Адрес прокси
+      <input id="k-px" type="text" spellcheck="false" autocomplete="off" placeholder="https://имя.workers.dev">
+    </label>
     <div id="k-result"></div>
     <div class="keys-actions">
       <button class="k-primary" id="k-test"></button>
@@ -898,6 +901,9 @@ const CONFIG = {
   // Ключ: football-data.org/client/register (10 запросов в минуту)
   fdKey: "",
   fdBase: "https://api.football-data.org/v4",
+  // Адрес Cloudflare Worker. Если задан — ключ живёт на сервере,
+  // на странице его нет, и CORS больше не мешает.
+  fdProxy: "",
 
   cacheTtl: 60_000,
   timeout: 9_000
@@ -985,6 +991,8 @@ const I18N = {
     tableFix: "Полная таблица: возьмите бесплатный ключ на football-data.org/client/register и впишите его в fdKey в начале скрипта.",
     keysTitle: "Ключи источников",
     keysHint: "Вставь ключ и нажми «Проверить» — результат будет виден сразу, без перезаливки файла. Ключи действуют до перезагрузки страницы; когда всё заработает, впиши их в блок CONFIG.",
+    keysProxy: "Адрес прокси (Cloudflare Worker)",
+    keysViaProxy: "через прокси",
     keysCheck: "Проверить",
     keysClose: "Закрыть",
     keysBtn: "Ключи источников",
@@ -1104,6 +1112,8 @@ const I18N = {
     tableFix: "To'liq jadval uchun football-data.org/client/register saytidan bepul kalit oling va uni skript boshidagi fdKey ga yozing.",
     keysTitle: "Manba kalitlari",
     keysHint: "Kalitni joylang va «Tekshirish» tugmasini bosing — natija darhol ko'rinadi. Kalitlar sahifa yangilanguncha amal qiladi; ishlagach, ularni CONFIG blokiga yozing.",
+    keysProxy: "Proksi manzili (Cloudflare Worker)",
+    keysViaProxy: "proksi orqali",
     keysCheck: "Tekshirish",
     keysClose: "Yopish",
     keysBtn: "Manba kalitlari",
@@ -1524,7 +1534,10 @@ async function olGet(path) {
 }
 
 async function fdGet(path) {
-  const url = `${CONFIG.fdBase}${path}`;
+  // Через прокси заголовок с ключом не нужен — а без него браузер
+  // не шлёт проверочный OPTIONS, из-за которого всё и упиралось в CORS
+  const viaProxy = !!CONFIG.fdProxy;
+  const url = `${viaProxy ? CONFIG.fdProxy.replace(/\/+$/, "") : CONFIG.fdBase}${path}`;
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.data;
 
@@ -1532,7 +1545,10 @@ async function fdGet(path) {
   const timer = setTimeout(() => ctrl.abort(), CONFIG.timeout);
   let res;
   try {
-    res = await fetch(url, { signal: ctrl.signal, headers: { "X-Auth-Token": CONFIG.fdKey } });
+    res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: viaProxy ? {} : { "X-Auth-Token": CONFIG.fdKey }
+    });
   } catch (e) {
     throw new ApiError(
       e.name === "AbortError" ? "timeout" : (isFileOrigin() ? "file" : "cors"), path);
@@ -1875,7 +1891,7 @@ async function olTable(league) {
 
 async function loadTable(league, sport) {
   state.fdError = null;
-  if (CONFIG.fdKey && league.fdCode) {
+  if ((CONFIG.fdKey || CONFIG.fdProxy) && league.fdCode) {
     try { return await fdTable(league); }
     catch (e) {
       // Раньше ошибка терялась, и было непонятно, почему строк всего пять
@@ -2557,6 +2573,8 @@ function keysOpen(open) {
   $("#k-close").textContent = L.keysClose;
   $("#k-fd").value = CONFIG.fdKey || "";
   $("#k-af").value = CONFIG.afKey || "";
+  $("#k-px").value = CONFIG.fdProxy || "";
+  $("#k-pxlab").childNodes[0].nodeValue = L.keysProxy;
   $("#k-result").innerHTML = "";
 }
 
@@ -2577,6 +2595,7 @@ async function keysTest() {
   const L = t();
   const fd = $("#k-fd").value.trim();
   const af = $("#k-af").value.trim();
+  const px = $("#k-px").value.trim();
   const out = $("#k-result");
 
   out.innerHTML = keyLine("football-data.org", null, L.keysTesting) +
@@ -2584,17 +2603,19 @@ async function keysTest() {
 
   CONFIG.fdKey = fd;
   CONFIG.afKey = af;
+  CONFIG.fdProxy = px;
   cache.clear(); windowCache.clear(); afSeasonCache.clear(); afWindowTop = null;
 
   let fdLine, afLine;
 
-  if (!fd) {
+  if (!fd && !px) {
     fdLine = keyLine("football-data.org", false, L.keysEmpty);
   } else {
     try {
       const d = await fdGet(`/competitions/PL/standings`);
       const n = (d.standings || []).find((b) => b.type === "TOTAL")?.table?.length || 0;
-      fdLine = keyLine("football-data.org", n > 5, `${L.keysOk}, ${n} ${L.keysRows}`);
+      const how = px ? ` (${L.keysViaProxy})` : "";
+      fdLine = keyLine("football-data.org", n > 5, `${L.keysOk}${how}, ${n} ${L.keysRows}`);
     } catch (e) { fdLine = keyLine("football-data.org", false, describeErr(e)); }
   }
 
@@ -2614,7 +2635,7 @@ async function keysTest() {
 
   // Провайдер выбираем сам: если рабочего ключа football-data.org нет,
   // но есть API-Football — переключаемся на него
-  if (!fd && af) CONFIG.provider = "apifootball";
+  if (!fd && !px && af) CONFIG.provider = "apifootball";
   load();
 }
 

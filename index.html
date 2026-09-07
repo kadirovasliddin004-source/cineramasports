@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="me-color" content="#F2B417">
+<meta name="theme-color" content="#F2B417">
 <title>ТАБЛО — результаты и расписание: футбол, UFC, Формула-1</title>
 <meta name="description" content="Результаты матчей и расписание: Лига чемпионов, АПЛ, Ла Лига, Серия А, Бундеслига, Лига 1, UFC и Формула-1.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -693,6 +693,71 @@ footer{
   .cal-cell{height:44px;font-size:12px}
 }
 
+
+/* ============================================================
+   Панель ключей
+   ============================================================ */
+.keys{
+  position:fixed;inset:0;z-index:100;
+  display:grid;place-items:center;padding:var(--pad);
+  background:rgba(25,21,16,.45);
+  backdrop-filter:blur(3px);
+}
+.keys[hidden]{display:none}
+.keys-box{
+  width:100%;max-width:520px;
+  background:var(--paper);
+  border:1px solid var(--line-2);border-radius:var(--r-lg);
+  padding:clamp(18px,4vw,28px);
+  box-shadow:0 24px 60px -20px rgba(93,66,8,.45);
+}
+.keys-box h2{
+  font-family:var(--font-display);font-weight:700;font-size:19px;
+  margin-bottom:8px;
+}
+.keys-box p{color:var(--muted);font-size:13px;line-height:1.55;margin-bottom:18px}
+.keys-box label{
+  display:block;margin-bottom:14px;
+  font-family:var(--font-data);font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--gold-deep);
+}
+.keys-box input{
+  display:block;width:100%;margin-top:6px;
+  padding:10px 13px;
+  background:var(--sand);
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  font-family:var(--font-data);font-size:13px;
+  letter-spacing:0;text-transform:none;color:var(--ink);
+  outline:none;transition:border-color .18s ease;
+}
+.keys-box input:focus{border-color:var(--gold)}
+.keys-actions{display:flex;gap:10px;margin-top:20px}
+.k-primary{
+  padding:10px 22px;border-radius:100px;
+  background:linear-gradient(160deg,#FFD75E,var(--gold) 55%,var(--gold-edge));
+  border:1px solid var(--gold-edge);
+  color:var(--ink);font-weight:700;font-size:13px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+.k-ghost{
+  padding:10px 18px;border-radius:100px;
+  border:1px solid var(--line);color:var(--muted);font-size:13px;
+}
+.k-ghost:hover{color:var(--ink);border-color:var(--line-2)}
+#k-result:not(:empty){
+  margin-top:16px;padding:12px 14px;
+  background:var(--sand);border-radius:var(--r-sm);
+}
+.k-line{
+  display:flex;gap:8px;align-items:baseline;
+  font-size:12.5px;line-height:1.6;color:var(--muted);
+}
+.k-line + .k-line{margin-top:6px}
+.k-line b{font-family:var(--font-data);flex:none}
+.k-line span{font-weight:600;color:var(--ink)}
+.k-line.k-ok b{color:#1B8A4B}
+.k-line.k-bad b{color:var(--live)}
+
 /* ============================================================
    Адаптив
    ============================================================ */
@@ -741,6 +806,12 @@ footer{
 
     <div class="langsw" role="group" id="langsw"></div>
 
+    <button class="icon-btn" id="keysbtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="m17 6 2 2"/><path d="m14 9 2 2"/>
+      </svg>
+    </button>
+
     <button class="icon-btn" id="refresh">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
         <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
@@ -779,6 +850,24 @@ footer{
   <div id="content" aria-live="polite"></div>
 </main>
 
+<div class="keys" id="keys" hidden>
+  <div class="keys-box" role="dialog" aria-modal="true">
+    <h2 id="k-title"></h2>
+    <p id="k-hint"></p>
+    <label>football-data.org
+      <input id="k-fd" type="text" spellcheck="false" autocomplete="off" placeholder="ключ для таблиц">
+    </label>
+    <label>API-Football
+      <input id="k-af" type="text" spellcheck="false" autocomplete="off" placeholder="ключ для игроков">
+    </label>
+    <div id="k-result"></div>
+    <div class="keys-actions">
+      <button class="k-primary" id="k-test"></button>
+      <button class="k-ghost" id="k-close"></button>
+    </div>
+  </div>
+</div>
+
 <footer class="wrap">
   <div><span id="brand-word"></span> · <span id="tagline"></span></div>
   <div>TheSportsDB · <span id="footer-note"></span></div>
@@ -794,7 +883,7 @@ footer{
 const CONFIG = {
   // Источник для футбола: "thesportsdb" или "apifootball".
   // UFC и Формула-1 всегда идут через TheSportsDB.
-  provider: "apifootball",
+  provider: "thesportsdb",
 
   // --- TheSportsDB: работает сразу, ключ 123 бесплатный и общий ---
   apiKey: "123",
@@ -807,7 +896,7 @@ const CONFIG = {
 
   // --- football-data.org: полная таблица, бесплатно и навсегда ---
   // Ключ: football-data.org/client/register (10 запросов в минуту)
-  fdKey: "4d2215a84b594969b7084fdf569f2c67",
+  fdKey: "",
   fdBase: "https://api.football-data.org/v4",
 
   cacheTtl: 60_000,
@@ -894,7 +983,18 @@ const I18N = {
     playersNeedAf: "Реальные данные по игрокам отдаёт только API-Football. TheSportsDB такого метода не имеет.",
     tableCapped: "Здесь только 5 строк — больше бесплатный ключ TheSportsDB не отдаёт.",
     tableFix: "Полная таблица: возьмите бесплатный ключ на football-data.org/client/register и впишите его в fdKey в начале скрипта.",
+    keysTitle: "Ключи источников",
+    keysHint: "Вставь ключ и нажми «Проверить» — результат будет виден сразу, без перезаливки файла. Ключи действуют до перезагрузки страницы; когда всё заработает, впиши их в блок CONFIG.",
+    keysCheck: "Проверить",
+    keysClose: "Закрыть",
+    keysBtn: "Ключи источников",
+    keysEmpty: "не задан",
+    keysOk: "работает",
+    keysTesting: "проверяю…",
+    keysRows: "строк в таблице",
+    keysPlan: "тариф",
     source: "Источник",
+    fdFailed: "football-data.org не ответил, поэтому таблица взята из запасного источника.",
     rows: "строк",
     seasonOld: "Бесплатный тариф API-Football не открывает текущий сезон. Показаны данные за сезон",
     viewAlias: { f1: { schedule: "Календарь" } },
@@ -920,11 +1020,11 @@ const I18N = {
     err: {
       file: "Страница открыта прямо с диска (file://). Браузер запрещает такой странице обращаться к API.",
       cors: "Браузер заблокировал запрос к API — не хватает разрешения CORS.",
-      rate: "Слишком много запросов. У бесплатного ключа лимит 30 в минуту.",
+      rate: "Слишком много запросов подряд. У бесплатных ключей лимит на минуту: 10 у football-data.org, 30 у TheSportsDB.",
       http: "API ответил ошибкой",
       timeout: "API не ответил вовремя.",
       empty: "API ответил, но матчей не вернул.",
-      key: "Ключ API-Football отклонён."
+      key: "Источник отклонил ключ."
     },
     errFix: {
       file: "Запустите локальный сервер в папке с файлом: python3 -m http.server 8080 — и откройте http://localhost:8080",
@@ -933,7 +1033,7 @@ const I18N = {
       http: "Проверьте ключ и адрес в блоке CONFIG в начале скрипта.",
       timeout: "Проверьте подключение к интернету.",
       empty: "Возможно, в этом турнире сейчас пауза или межсезонье.",
-      key: "Проверьте значение afKey в блоке CONFIG."
+      key: "Проверьте ключ в блоке CONFIG: fdKey для football-data.org, afKey для API-Football."
     },
     emptyTitle: "Ничего не найдено",
     emptyText: "Попробуйте другой турнир или очистите поиск.",
@@ -1000,7 +1100,18 @@ const I18N = {
     playersNeedAf: "O'yinchilar bo'yicha haqiqiy ma'lumotni faqat API-Football beradi. TheSportsDB'da bunday metod yo'q.",
     tableCapped: "Bu yerda atigi 5 qator — TheSportsDB bepul kaliti ko'proq bermaydi.",
     tableFix: "To'liq jadval uchun football-data.org/client/register saytidan bepul kalit oling va uni skript boshidagi fdKey ga yozing.",
+    keysTitle: "Manba kalitlari",
+    keysHint: "Kalitni joylang va «Tekshirish» tugmasini bosing — natija darhol ko'rinadi. Kalitlar sahifa yangilanguncha amal qiladi; ishlagach, ularni CONFIG blokiga yozing.",
+    keysCheck: "Tekshirish",
+    keysClose: "Yopish",
+    keysBtn: "Manba kalitlari",
+    keysEmpty: "kiritilmagan",
+    keysOk: "ishlayapti",
+    keysTesting: "tekshirilmoqda…",
+    keysRows: "jadval qatori",
+    keysPlan: "tarif",
     source: "Manba",
+    fdFailed: "football-data.org javob bermadi, shuning uchun jadval zaxira manbadan olindi.",
     rows: "qator",
     seasonOld: "API-Football bepul tarifi joriy mavsumni ochmaydi. Ko'rsatilgan ma'lumot — mavsum",
     viewAlias: { f1: { schedule: "Kalendar" } },
@@ -1026,11 +1137,11 @@ const I18N = {
     err: {
       file: "Sahifa to'g'ridan-to'g'ri diskdan ochilgan (file://). Brauzer bunday sahifaga API'ga murojaat qilishni taqiqlaydi.",
       cors: "Brauzer API so'rovini bloklalab qo'ydi — CORS ruxsati yo'q.",
-      rate: "So'rovlar juda ko'p. Bepul kalit uchun limit — daqiqasiga 30 ta.",
+      rate: "Ketma-ket so'rovlar juda ko'p. Bepul kalitlar limiti: football-data.org — 10, TheSportsDB — 30 ta daqiqasiga.",
       http: "API xatolik qaytardi",
       timeout: "API o'z vaqtida javob bermadi.",
       empty: "API javob berdi, lekin o'yinlarni qaytarmadi.",
-      key: "API-Football kaliti rad etildi."
+      key: "Manba kalitni rad etdi."
     },
     errFix: {
       file: "Fayl turgan papkada lokal server ishga tushiring: python3 -m http.server 8080 — so'ng http://localhost:8080 ni oching.",
@@ -1039,7 +1150,7 @@ const I18N = {
       http: "Skript boshidagi CONFIG blokida kalit va manzilni tekshiring.",
       timeout: "Internet ulanishini tekshiring.",
       empty: "Ehtimol, bu turnirda hozir tanaffus yoki mavsumlararo davr.",
-      key: "CONFIG blokidagi afKey qiymatini tekshiring."
+      key: "CONFIG blokidagi kalitni tekshiring: football-data.org uchun fdKey, API-Football uchun afKey."
     },
     emptyTitle: "Hech narsa topilmadi",
     emptyText: "Boshqa turnirni tanlang yoki qidiruvni tozalang.",
@@ -1157,7 +1268,8 @@ const state = {
   query: "",
   usedDemo: false,
   seasonShift: null,                        // сезон, который реально отдал API
-  tableSource: null,                        // откуда пришла таблица
+  tableSource: null,
+  fdError: null,                            // почему не сработал football-data.org                        // откуда пришла таблица
   lastError: null,                          // чем именно закончился последний запрос
   playerKind: "goals",                      // "goals" | "assists" внутри вкладки «Игроки»
   round: null,                              // выбранный тур, null = определить сам
@@ -1727,9 +1839,14 @@ async function olTable(league) {
 }
 
 async function loadTable(league, sport) {
+  state.fdError = null;
   if (CONFIG.fdKey && league.fdCode) {
     try { return await fdTable(league); }
-    catch (e) { if (e.kind === "key") throw e; /* иначе пробуем дальше */ }
+    catch (e) {
+      // Раньше ошибка терялась, и было непонятно, почему строк всего пять
+      state.fdError = e;
+      if (e.kind === "key") throw e;
+    }
   }
 
   if (useApiFootball(sport)) {
@@ -2026,6 +2143,8 @@ function renderChrome() {
   $("#footer-note").textContent = L.footerNote;
   $("#refresh").title = L.refresh;
   $("#refresh").setAttribute("aria-label", L.refresh);
+  $("#keysbtn").title = L.keysBtn;
+  $("#keysbtn").setAttribute("aria-label", L.keysBtn);
   $("#langsw").setAttribute("aria-label", L.langLabel);
   const inp = $("#search");
   inp.placeholder = L.searchPh;
@@ -2242,9 +2361,11 @@ function renderTable(rows) {
   const th = (k) => `<th title="${esc(L.thTitle[k] || "")}">${esc(L.th[k])}</th>`;
 
   // На бесплатном ключе TheSportsDB таблица обрезана до 5 строк — говорим об этом прямо
-  const capped = (!state.usedDemo && state.tableSource === "TheSportsDB" && rows.length <= 5)
-    ? `<p class="hint">${esc(L.tableCapped)}<br><span class="hint-fix">${esc(L.tableFix)}</span></p>`
-    : seasonHintHTML();
+  const capped = state.fdError
+    ? fdHintHTML()
+    : (!state.usedDemo && state.tableSource === "TheSportsDB" && rows.length <= 5)
+      ? `<p class="hint">${esc(L.tableCapped)}<br><span class="hint-fix">${esc(L.tableFix)}</span></p>`
+      : seasonHintHTML();
 
   const src = (!state.usedDemo && state.tableSource)
     ? `<p class="srcline">${esc(L.source)}: ${esc(state.tableSource)} · ${rows.length} ${esc(L.rows)}</p>` : "";
@@ -2359,6 +2480,18 @@ function calendarHTML() {
 
 // Если ключу доступен не текущий сезон — говорим об этом прямо,
 // чтобы старые цифры не выглядели свежими
+// Ключ вписан, но источник не ответил — объясняем, почему таблица короткая
+function fdHintHTML() {
+  const e = state.fdError;
+  if (!e) return "";
+  const L = t();
+  const kind = e.kind && L.err[e.kind] ? e.kind : null;
+  const why = kind ? L.err[kind] + (kind === "http" && e.detail ? ` ${e.detail}.` : "") : "";
+  const fix = kind ? L.errFix[kind] : "";
+  return `<p class="hint">${esc(L.fdFailed)} ${esc(why)}` +
+         (fix ? `<br><span class="hint-fix">${esc(fix)}</span>` : "") + `</p>`;
+}
+
 function seasonHintHTML() {
   if (!state.seasonShift) return "";
   const y = state.seasonShift;
@@ -2373,6 +2506,82 @@ function notice(title, text, retry) {
 }
 
 const skeleton = () => `<div class="list">${'<div class="skel"></div>'.repeat(6)}</div>`;
+
+/* ---------- Панель ключей ----------
+   Правка файла и перезаливка на хостинг — долгий цикл, в котором легко
+   ошибиться. Здесь ключ можно проверить прямо на странице за секунду. */
+
+function keysOpen(open) {
+  const L = t();
+  const box = $("#keys");
+  box.hidden = !open;
+  if (!open) return;
+  $("#k-title").textContent = L.keysTitle;
+  $("#k-hint").textContent = L.keysHint;
+  $("#k-test").textContent = L.keysCheck;
+  $("#k-close").textContent = L.keysClose;
+  $("#k-fd").value = CONFIG.fdKey || "";
+  $("#k-af").value = CONFIG.afKey || "";
+  $("#k-result").innerHTML = "";
+}
+
+function keyLine(name, ok, text) {
+  const mark = ok === null ? "…" : ok ? "✓" : "✗";
+  const cls = ok === null ? "" : ok ? "k-ok" : "k-bad";
+  return `<div class="k-line ${cls}"><b>${mark}</b> <span>${esc(name)}</span> — ${esc(text)}</div>`;
+}
+
+function describeErr(e) {
+  const L = t();
+  if (!e || !e.kind) return String(e && e.message || "ошибка");
+  const base = L.err[e.kind] || e.kind;
+  return base + (e.kind === "http" && e.detail ? ` ${e.detail}.` : "");
+}
+
+async function keysTest() {
+  const L = t();
+  const fd = $("#k-fd").value.trim();
+  const af = $("#k-af").value.trim();
+  const out = $("#k-result");
+
+  out.innerHTML = keyLine("football-data.org", null, L.keysTesting) +
+                  keyLine("API-Football", null, L.keysTesting);
+
+  CONFIG.fdKey = fd;
+  CONFIG.afKey = af;
+  cache.clear(); windowCache.clear(); afSeasonCache.clear();
+
+  let fdLine, afLine;
+
+  if (!fd) {
+    fdLine = keyLine("football-data.org", false, L.keysEmpty);
+  } else {
+    try {
+      const d = await fdGet(`/competitions/PL/standings`);
+      const n = (d.standings || []).find((b) => b.type === "TOTAL")?.table?.length || 0;
+      fdLine = keyLine("football-data.org", n > 5, `${L.keysOk}, ${n} ${L.keysRows}`);
+    } catch (e) { fdLine = keyLine("football-data.org", false, describeErr(e)); }
+  }
+
+  if (!af) {
+    afLine = keyLine("API-Football", false, L.keysEmpty);
+  } else {
+    try {
+      const d = await afGet(`/status`);
+      const plan = d.response?.subscription?.plan || "?";
+      const used = d.response?.requests?.current ?? "?";
+      const max  = d.response?.requests?.limit_day ?? "?";
+      afLine = keyLine("API-Football", true, `${L.keysOk}, ${L.keysPlan}: ${plan} (${used}/${max})`);
+    } catch (e) { afLine = keyLine("API-Football", false, describeErr(e)); }
+  }
+
+  out.innerHTML = fdLine + afLine;
+
+  // Провайдер выбираем сам: если рабочего ключа football-data.org нет,
+  // но есть API-Football — переключаемся на него
+  if (!fd && af) CONFIG.provider = "apifootball";
+  load();
+}
 
 /* ============================================================
    9. КОНТРОЛЛЕР
@@ -2614,6 +2823,12 @@ function setView(id) {
   state.view = id;
   load();
 }
+
+$("#keysbtn").addEventListener("click", () => keysOpen(true));
+$("#k-close").addEventListener("click", () => keysOpen(false));
+$("#k-test").addEventListener("click", keysTest);
+$("#keys").addEventListener("click", (e) => { if (e.target.id === "keys") keysOpen(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") keysOpen(false); });
 
 $("#langsw").addEventListener("click", (e) => {
   const b = e.target.closest("[data-lang]"); if (b) setLang(b.dataset.lang);

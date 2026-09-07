@@ -1024,6 +1024,7 @@ const I18N = {
       http: "API ответил ошибкой",
       timeout: "API не ответил вовремя.",
       empty: "API ответил, но матчей не вернул.",
+      season: "Бесплатный тариф API-Football не открывает ни один сезон этого турнира.",
       key: "Источник отклонил ключ."
     },
     errFix: {
@@ -1033,6 +1034,7 @@ const I18N = {
       http: "Проверьте ключ и адрес в блоке CONFIG в начале скрипта.",
       timeout: "Проверьте подключение к интернету.",
       empty: "Возможно, в этом турнире сейчас пауза или межсезонье.",
+      season: "Выберите другой турнир, либо возьмите ключ football-data.org — он даёт текущий сезон бесплатно.",
       key: "Проверьте ключ в блоке CONFIG: fdKey для football-data.org, afKey для API-Football."
     },
     emptyTitle: "Ничего не найдено",
@@ -1141,6 +1143,7 @@ const I18N = {
       http: "API xatolik qaytardi",
       timeout: "API o'z vaqtida javob bermadi.",
       empty: "API javob berdi, lekin o'yinlarni qaytarmadi.",
+      season: "API-Football bepul tarifi bu turnirning birorta mavsumini ochmaydi.",
       key: "Manba kalitni rad etdi."
     },
     errFix: {
@@ -1150,6 +1153,7 @@ const I18N = {
       http: "Skript boshidagi CONFIG blokida kalit va manzilni tekshiring.",
       timeout: "Internet ulanishini tekshiring.",
       empty: "Ehtimol, bu turnirda hozir tanaffus yoki mavsumlararo davr.",
+      season: "Boshqa turnirni tanlang yoki football-data.org kalitini oling — u joriy mavsumni bepul beradi.",
       key: "CONFIG blokidagi kalitni tekshiring: football-data.org uchun fdKey, API-Football uchun afKey."
     },
     emptyTitle: "Hech narsa topilmadi",
@@ -1550,16 +1554,36 @@ const afSeason = (league) => String(league.season).slice(0, 4);
    он обычно не отдаёт. Поэтому шагаем от свежего к старому, пока не придут
    данные, и запоминаем найденный год — чтобы не тратить запросы повторно. */
 const afSeasonCache = new Map();
+let afWindowTop = null;   // верхняя граница диапазона, о которой сообщил сам API
+
+/* API-Football в тексте ошибки прямо пишет допустимый диапазон:
+   «Free plans do not have access to this season, try from 2022 to 2024».
+   Читаем его и прыгаем сразу на нужный год — вместо перебора вслепую.
+   Это ещё и экономит суточный лимит в 100 запросов. */
+function seasonRangeFrom(detail) {
+  const m = String(detail || "").match(/from\s+(\d{4})\s+to\s+(\d{4})/i);
+  return m ? Number(m[2]) : null;
+}
 
 async function afResolveSeason(league) {
   const want = Number(afSeason(league));
   const key = String(league.afId);
+
   if (afSeasonCache.has(key)) {
     const got = afSeasonCache.get(key);
     state.seasonShift = got === want ? null : got;
     return got;
   }
-  for (let y = want; y >= want - 3; y--) {
+
+  // Если диапазон уже известен по другому турниру — начинаем прямо с него
+  const queue = [afWindowTop ? Math.min(want, afWindowTop) : want];
+  const tried = new Set();
+
+  for (let step = 0; step < 6; step++) {
+    const y = queue.shift();
+    if (y === undefined || tried.has(y)) continue;
+    tried.add(y);
+
     try {
       const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&last=1`);
       if ((d.response || []).length) {
@@ -1567,13 +1591,24 @@ async function afResolveSeason(league) {
         state.seasonShift = y === want ? null : y;
         return y;
       }
+      queue.push(y - 1);                       // ответ пустой, но без ошибки
     } catch (e) {
-      if (e.kind === "key" || e.kind === "rate") throw e;   // дальше пробовать бессмысленно
+      if (e.kind === "key" || e.kind === "rate") throw e;
+
+      const top = seasonRangeFrom(e.detail);
+      if (top) {
+        afWindowTop = top;                     // запоминаем для остальных турниров
+        queue.length = 0;
+        queue.push(top, top - 1, top - 2);
+      } else {
+        queue.push(y - 1);
+      }
     }
   }
-  afSeasonCache.set(key, want);
-  state.seasonShift = null;
-  return want;
+
+  // Раньше здесь возвращался текущий сезон, и следом уходил заведомо
+  // отвергаемый запрос — вместо понятной ошибки получалась путаница
+  throw new ApiError("season", String(want));
 }
 
 function normalizeEvent(ev, sport, league) {
@@ -2549,7 +2584,7 @@ async function keysTest() {
 
   CONFIG.fdKey = fd;
   CONFIG.afKey = af;
-  cache.clear(); windowCache.clear(); afSeasonCache.clear();
+  cache.clear(); windowCache.clear(); afSeasonCache.clear(); afWindowTop = null;
 
   let fdLine, afLine;
 

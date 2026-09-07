@@ -986,7 +986,8 @@ const I18N = {
     },
     noPlayersTitle: "Статистики игроков нет",
     noPlayersText: "Этот источник не отдаёт бомбардиров и ассистентов.",
-    playersNeedAf: "Реальные данные по игрокам отдаёт только API-Football. TheSportsDB такого метода не имеет.",
+    playersNeedAf: "Статистику игроков отдают football-data.org и API-Football. У TheSportsDB такого метода нет.",
+    assistsPaid: "Голевые передачи football-data.org отдаёт только на платном тарифе Deep Data. Показаны голы; для передач нужен ключ API-Football — но там доступен лишь прошлый сезон.",
     tableCapped: "Здесь только 5 строк — больше бесплатный ключ TheSportsDB не отдаёт.",
     tableFix: "Полная таблица: возьмите бесплатный ключ на football-data.org/client/register и впишите его в fdKey в начале скрипта.",
     keysTitle: "Ключи источников",
@@ -1107,7 +1108,8 @@ const I18N = {
     },
     noPlayersTitle: "O'yinchilar statistikasi yo'q",
     noPlayersText: "Bu manba bombardirlar va assistentlarni bermaydi.",
-    playersNeedAf: "O'yinchilar bo'yicha haqiqiy ma'lumotni faqat API-Football beradi. TheSportsDB'da bunday metod yo'q.",
+    playersNeedAf: "O'yinchilar statistikasini football-data.org va API-Football beradi. TheSportsDB'da bunday metod yo'q.",
+    assistsPaid: "Gol uzatmalarini football-data.org faqat pullik Deep Data tarifida beradi. Gollar ko'rsatilgan; uzatmalar uchun API-Football kaliti kerak, lekin u faqat o'tgan mavsumni ochadi.",
     tableCapped: "Bu yerda atigi 5 qator — TheSportsDB bepul kaliti ko'proq bermaydi.",
     tableFix: "To'liq jadval uchun football-data.org/client/register saytidan bepul kalit oling va uni skript boshidagi fdKey ga yozing.",
     keysTitle: "Manba kalitlari",
@@ -1283,6 +1285,9 @@ const state = {
   usedDemo: false,
   seasonShift: null,                        // сезон, который реально отдал API
   tableSource: null,
+  playerSource: null,                       // откуда пришли бомбардиры
+  playerSeason: null,
+  assistsMissing: false,                    // источник не отдал передачи
   fdError: null,                            // почему не сработал football-data.org                        // откуда пришла таблица
   lastError: null,                          // чем именно закончился последний запрос
   playerKind: "goals",                      // "goals" | "assists" внутри вкладки «Игроки»
@@ -1783,14 +1788,38 @@ async function loadDay(league, sport, date) {
   return (data.events || []).map((e) => normalizeEvent(e, sport, league)).sort((a, b) => a.ts - b.ts);
 }
 
-// Бомбардиры и ассистенты. У TheSportsDB такого метода нет —
-// работает только на API-Football.
-async function loadPlayers(league, sport, kind) {
-  if (!useApiFootball(sport)) throw new Error("no-provider");
+/* Бомбардиры. Источников два, и у каждого свой изъян:
+     football-data.org — текущий сезон, но передачи может не отдать
+     API-Football      — передачи есть, но сезон только прошлый
+   Поэтому берём то, что реально пришло, и честно подписываем. */
+
+async function fdScorers(league, limit) {
+  const d = await fdGet(`/competitions/${league.fdCode}/scorers?limit=${limit || 20}`);
+  const raw = d.scorers || [];
+  if (!raw.length) throw new ApiError("empty", "scorers");
+
+  const rows = raw.map((r, i) => ({
+    rank: i + 1,
+    name: r.player?.name || "",
+    photo: "",
+    team: r.team?.shortName || r.team?.name || "",
+    teamBadge: r.team?.crest || "",
+    games: r.playedMatches ?? null,
+    goals: r.goals ?? 0,
+    assists: r.assists ?? null,      // на бесплатном тарифе бывает пусто
+    penalty: r.penalties ?? null
+  }));
+  state.playerSource = "football-data.org";
+  state.playerSeason = d.season?.startDate ? d.season.startDate.slice(0, 4) : null;
+  return rows;
+}
+
+async function afPlayers(league, sport, kind) {
+  if (!CONFIG.afKey) throw new ApiError("empty", "no-af-key");
   const path = kind === "assists" ? "topassists" : "topscorers";
   const y = await afResolveSeason(league);
   const d = await afGet(`/players/${path}?league=${league.afId}&season=${y}`);
-  return (d.response || []).map((r, i) => {
+  const rows = (d.response || []).map((r, i) => {
     const st = r.statistics?.[0] || {};
     return {
       rank: i + 1,
@@ -1804,6 +1833,42 @@ async function loadPlayers(league, sport, kind) {
       penalty: st.penalty?.scored || 0
     };
   });
+  if (!rows.length) throw new ApiError("empty", "topscorers");
+  state.playerSource = "API-Football";
+  state.playerSeason = String(y);
+  return rows;
+}
+
+async function loadPlayers(league, sport, kind) {
+  state.playerSource = null;
+  state.playerSeason = null;
+  state.assistsMissing = false;
+
+  const hasFd = (CONFIG.fdKey || CONFIG.fdProxy) && league.fdCode;
+
+  if (hasFd) {
+    try {
+      const rows = await fdScorers(league);
+      const anyAssists = rows.some((r) => r.assists !== null && r.assists !== undefined);
+
+      if (kind === "assists") {
+        if (anyAssists) {
+          return rows.slice()
+            .sort((a, b) => (b.assists || 0) - (a.assists || 0))
+            .map((r, i) => ({ ...r, rank: i + 1 }));
+        }
+        // Передач нет — пробуем второй источник, он их отдаёт
+        state.assistsMissing = true;
+        try { return await afPlayers(league, sport, kind); }
+        catch (e2) { state.playerSource = "football-data.org"; return rows; }
+      }
+      return rows;
+    } catch (e) {
+      if (e.kind === "rate") throw e;    // подождать, а не долбить второй источник
+    }
+  }
+
+  return await afPlayers(league, sport, kind);
 }
 
 // Результаты + расписание в одном списке. Нужны, чтобы отметить точками
@@ -2441,6 +2506,9 @@ function playerTabsHTML() {
   </div>`;
 }
 
+// Источник может не отдать часть цифр — показываем прочерк, а не ноль
+const num = (v) => (v === null || v === undefined) ? "—" : v;
+
 function renderPlayers(rows) {
   const L = t();
   if (!rows.length) return playerTabsHTML() + notice(L.noPlayersTitle, L.noPlayersText);
@@ -2456,15 +2524,25 @@ function renderPlayers(rows) {
         </div>
       </td>
       <td class="td-club">${esc(clubName(r.team))}</td>
-      <td>${r.games}</td>
-      <td class="${goalsFirst ? "pts" : ""}">${r.goals}</td>
-      <td class="${goalsFirst ? "" : "pts"}">${r.assists}</td>
-      <td>${r.penalty}</td>
+      <td>${num(r.games)}</td>
+      <td class="${goalsFirst ? "pts" : ""}">${num(r.goals)}</td>
+      <td class="${goalsFirst ? "" : "pts"}">${num(r.assists)}</td>
+      <td>${num(r.penalty)}</td>
     </tr>`).join("");
 
-  const hint = CONFIG.provider !== "apifootball"
-    ? `<p class="hint">${esc(L.playersNeedAf)}</p>`
-    : seasonHintHTML();
+  const parts = [];
+  if (!state.usedDemo && state.playerSource) {
+    const season = state.playerSeason
+      ? ` · ${esc(L.season.toLowerCase())} ${state.playerSeason}` : "";
+    parts.push(`<p class="srcline">${esc(L.source)}: ${esc(state.playerSource)}${season}</p>`);
+  }
+  if (state.assistsMissing && state.playerSource === "football-data.org") {
+    parts.push(`<p class="hint">${esc(L.assistsPaid)}</p>`);
+  }
+  if (state.usedDemo && !CONFIG.fdKey && !CONFIG.fdProxy && !CONFIG.afKey) {
+    parts.push(`<p class="hint">${esc(L.playersNeedAf)}</p>`);
+  }
+  const hint = parts.join("");
 
   return playerTabsHTML() + `<div class="tablewrap"><table class="ptable">
     <thead><tr>

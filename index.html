@@ -905,12 +905,17 @@ const CONFIG = {
   fdBase: "https://api.football-data.org/v4",
   // Адрес Cloudflare Worker. Если задан — ключ живёт на сервере,
   // на странице его нет, и CORS больше не мешает.
-  fdProxy: "https://tablo-proxy.kadirovasliddin004.workers.dev",
+  fdProxy: "",
 
   /* Переводить ли названия клубов на русский. По умолчанию выключено:
      словарь покрывает не все команды, и в таблице получался разнобой —
      часть названий по-русски, часть в оригинале. Включишь — дополни CLUBS_RU. */
   translateClubs: false,
+
+  /* Показывать в Лиге чемпионов только команды текущего розыгрыша.
+     Иначе в списки попадают матчи квалификации — там играют клубы,
+     которые в основную сетку не прошли. */
+  clOnlyCurrentTeams: true,
 
   cacheTtl: 60_000,
   timeout: 9_000
@@ -946,7 +951,7 @@ const SPORTS = [
     views: ["results", "schedule", "round", "cal", "table", "players"],
     // id — идентификатор в TheSportsDB, afId — та же лига в API-Football
     leagues: [
-      { id: "4480", afId: 2,   fdCode: "CL",  season: footballSeason() },
+      { id: "4480", afId: 2,   fdCode: "CL",  onlyCurrent: true, season: footballSeason() },
       { id: "4328", afId: 39,  fdCode: "PL",  season: footballSeason() },
       { id: "4335", afId: 140, fdCode: "PD",  season: footballSeason() },
       { id: "4332", afId: 135, fdCode: "SA",  season: footballSeason() },
@@ -1611,6 +1616,46 @@ async function fdGet(path) {
   return data;
 }
 
+/* Состав участников определяется жеребьёвкой каждый сезон, поэтому
+   зашить его в код нельзя — только спросить у источника.
+   Держим сутки: в течение сезона он не меняется. */
+const teamsCache = new Map();
+
+async function currentTeams(league) {
+  const key = `${league.fdCode}:teams`;
+  const hit = teamsCache.get(key);
+  if (hit && Date.now() - hit.at < 86_400_000) return hit.set;
+
+  const d = await fdGet(`/competitions/${league.fdCode}/teams`);
+  const set = new Set();
+  for (const t of (d.teams || [])) {
+    /* Берём только полное и короткое название. Трёхбуквенные коды
+       вроде «FCB» сюда не кладём: после чистки от них остаются
+       обрывки, которые могут случайно совпасть с чужим клубом. */
+    for (const v of [t.name, t.shortName]) if (v) set.add(clubKey(v));
+  }
+  if (set.size < 8) throw new ApiError("empty", "teams");
+  teamsCache.set(key, { at: Date.now(), set });
+  return set;
+}
+
+async function onlyCurrentTeams(items, league) {
+  if (!CONFIG.clOnlyCurrentTeams || !league.onlyCurrent || !league.fdCode) return items;
+  if (!CONFIG.fdKey && !CONFIG.fdProxy) return items;      // спросить не у кого
+
+  let set;
+  try { set = await currentTeams(league); }
+  catch (e) { return items; }                              // не вышло — показываем всё
+
+  const inSet = (n) => set.has(clubKey(n || ""));
+  const kept = items.filter((m) => inSet(m.home) && inSet(m.away));
+
+  /* Предохранитель: у разных API написание клубов отличается, и если
+     сопоставление вдруг развалится, отсеется всё подряд. Тогда лучше
+     показать список целиком, чем пустой экран. */
+  return kept.length ? kept : items;
+}
+
 // В API-Football сезон — один год: 2026-2027 → 2026
 const afSeason = (league) => String(league.season).slice(0, 4);
 
@@ -1785,11 +1830,12 @@ async function loadResults(league, sport) {
   if (useApiFootball(sport)) {
     const y = await afResolveSeason(league);
     const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&last=20`);
-    return (d.response || []).map(normalizeAF).sort((a, b) => b.ts - a.ts);
+    const rows = await onlyCurrentTeams((d.response || []).map(normalizeAF), league);
+    return rows.sort((a, b) => b.ts - a.ts);
   }
-  const all = sport.kind === "event"
+  const all = await onlyCurrentTeams(sport.kind === "event"
     ? await tsdbSeason(league, sport)
-    : await tsdbWindow(league, sport);
+    : await tsdbWindow(league, sport), league);
   const past = all.filter(isPast).sort((a, b) => b.ts - a.ts);
   return past.length ? past : all.sort((a, b) => b.ts - a.ts);
 }
@@ -1798,11 +1844,12 @@ async function loadSchedule(league, sport) {
   if (useApiFootball(sport)) {
     const y = await afResolveSeason(league);
     const d = await afGet(`/fixtures?league=${league.afId}&season=${y}&next=20`);
-    return (d.response || []).map(normalizeAF).sort((a, b) => a.ts - b.ts);
+    const rows = await onlyCurrentTeams((d.response || []).map(normalizeAF), league);
+    return rows.sort((a, b) => a.ts - b.ts);
   }
-  const all = sport.kind === "event"
+  const all = await onlyCurrentTeams(sport.kind === "event"
     ? await tsdbSeason(league, sport)
-    : await tsdbWindow(league, sport);
+    : await tsdbWindow(league, sport), league);
   const next = all.filter((m) => !isPast(m)).sort((a, b) => a.ts - b.ts);
   return next.length ? next : all.sort((a, b) => a.ts - b.ts);
 }
@@ -1816,7 +1863,8 @@ async function loadRound(league, sport, round) {
     return (d.response || []).map(normalizeAF).sort((a, b) => a.ts - b.ts);
   }
   const data = await getJSON(`eventsround.php?id=${league.id}&r=${round}&s=${league.season}`);
-  return (data.events || []).map((e) => normalizeEvent(e, sport, league)).sort((a, b) => a.ts - b.ts);
+  const rows = (data.events || []).map((e) => normalizeEvent(e, sport, league));
+  return (await onlyCurrentTeams(rows, league)).sort((a, b) => a.ts - b.ts);
 }
 
 // Матчи конкретной даты
@@ -1828,7 +1876,8 @@ async function loadDay(league, sport, date) {
     return (d.response || []).map(normalizeAF).sort((a, b) => a.ts - b.ts);
   }
   const data = await getJSON(`eventsday.php?d=${iso}&l=${league.id}`);
-  return (data.events || []).map((e) => normalizeEvent(e, sport, league)).sort((a, b) => a.ts - b.ts);
+  const rows = (data.events || []).map((e) => normalizeEvent(e, sport, league));
+  return (await onlyCurrentTeams(rows, league)).sort((a, b) => a.ts - b.ts);
 }
 
 /* Бомбардиры. Источников два, и у каждого свой изъян:

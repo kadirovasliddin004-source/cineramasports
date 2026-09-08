@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
-   ТАБЛО — дизайн-токены
+   CineramaSports — дизайн-токены
    Направление: программка матчевого дня — тёплая белая бумага
    с золотым тиснением. Результат «отчеканен» в золоте,
    ещё не сыгранный матч — только контур.
@@ -905,7 +905,7 @@ const CONFIG = {
   fdBase: "https://api.football-data.org/v4",
   // Адрес Cloudflare Worker. Если задан — ключ живёт на сервере,
   // на странице его нет, и CORS больше не мешает.
-  fdProxy: "https://tablo-proxy.kadirovasliddin004.workers.dev",
+  fdProxy: "",
 
   cacheTtl: 60_000,
   timeout: 9_000
@@ -1102,7 +1102,7 @@ const I18N = {
 
   uz: {
     htmlLang: "uz",
-    brand: "TABLO",
+    brand: "CineramaSports",
     tagline: "natijalar va jadval",
     footerNote: "vaqt sizning vaqt mintaqangizda",
     refresh: "Ma'lumotlarni yangilash",
@@ -2293,6 +2293,7 @@ function demoFor(sport, league, view) {
 function renderChrome() {
   const L = t();
   document.documentElement.lang = L.htmlLang;
+  document.title = `${L.brand} — ${L.tagline}`;
   $("#brand-name").textContent = L.brand;
   $(".brand").setAttribute("aria-label", L.brand);
   $("#brand-word").textContent = L.brand;
@@ -2783,6 +2784,50 @@ async function keysTest() {
   load();
 }
 
+/* ---------- Состояние в адресе страницы ----------
+   Вид записывается в хвост адреса после #, поэтому F5 возвращает
+   ровно туда же, где ты был. Заодно ссылкой можно поделиться.
+   Используем replaceState, чтобы не засорять историю браузера. */
+
+function writeHash() {
+  const parts = [state.lang, state.sport.id, state.league.id, state.view];
+  if (state.view === "round" && state.round) parts.push(state.round);
+  if (state.view === "cal" && state.calDay) parts.push(isoKey(state.calDay));
+  if (state.view === "players") parts.push(state.playerKind);
+
+  const h = "#" + parts.join("/");
+  if (location.hash !== h) {
+    try { history.replaceState(null, "", h); } catch (e) { location.hash = h; }
+  }
+}
+
+function applyHash() {
+  const raw = (location.hash || "").replace(/^#/, "").trim();
+  if (!raw) return;
+  const [lang, sportId, leagueId, view, extra] = raw.split("/");
+
+  if (I18N[lang]) state.lang = lang;
+
+  const sport = SPORTS.find((s) => s.id === sportId);
+  if (!sport) return;                       // мусор в адресе — остаёмся на умолчаниях
+  state.sport = sport;
+  state.league = sport.leagues.find((l) => l.id === leagueId) || sport.leagues[0];
+  state.view = sport.views.includes(view) ? view : sport.views[0];
+
+  if (state.view === "round") {
+    const n = Number(extra);
+    if (Number.isFinite(n) && n >= 1 && n <= 60) state.round = n;
+  }
+  if (state.view === "cal" && /^\d{4}-\d{2}-\d{2}$/.test(extra || "")) {
+    const [y, m, d] = extra.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    if (!isNaN(dt)) { state.calDay = dt; state.calMonth = startOfMonth(dt); }
+  }
+  if (state.view === "players" && (extra === "goals" || extra === "assists")) {
+    state.playerKind = extra;
+  }
+}
+
 /* ============================================================
    9. КОНТРОЛЛЕР
    ============================================================ */
@@ -2816,6 +2861,7 @@ async function load() {
   const { sport, league, view } = state;
 
   state.lastError = null;
+  writeHash();
   renderChrome();
   $("#content").innerHTML = skeleton();
 
@@ -2834,6 +2880,7 @@ const done = (token) => token === loadToken;
 
 function finish(token, failed, html) {
   if (!done(token)) return false;
+  writeHash();                     // тур мог определиться уже после старта загрузки
   state.usedDemo = failed;
   renderChrome();
   $("#content").innerHTML = html;
@@ -3102,6 +3149,12 @@ setInterval(() => {
   if (!document.hidden && state.view !== "table") { cache.clear(); windowCache.clear(); load(); }
 }, 120_000);
 
+/* Смена адреса вручную, переход по ссылке или кнопка «назад».
+   Наш writeHash работает через replaceState и это событие не вызывает,
+   так что зациклиться здесь нельзя. */
+window.addEventListener("hashchange", () => { applyHash(); load(); });
+
+applyHash();
 load();
 
 </script>

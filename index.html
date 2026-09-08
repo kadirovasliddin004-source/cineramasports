@@ -905,7 +905,12 @@ const CONFIG = {
   fdBase: "https://api.football-data.org/v4",
   // Адрес Cloudflare Worker. Если задан — ключ живёт на сервере,
   // на странице его нет, и CORS больше не мешает.
-  fdProxy: "https://tablo-proxy.kadirovasliddin004.workers.dev",
+  fdProxy: "",
+
+  /* Переводить ли названия клубов на русский. По умолчанию выключено:
+     словарь покрывает не все команды, и в таблице получался разнобой —
+     часть названий по-русски, часть в оригинале. Включишь — дополни CLUBS_RU. */
+  translateClubs: false,
 
   cacheTtl: 60_000,
   timeout: 9_000
@@ -938,7 +943,7 @@ const SPORTS = [
   {
     id: "football",
     kind: "match",
-    views: ["results", "schedule", "round", "cal", "table"],
+    views: ["results", "schedule", "round", "cal", "table", "players"],
     // id — идентификатор в TheSportsDB, afId — та же лига в API-Football
     leagues: [
       { id: "4480", afId: 2,   fdCode: "CL",  season: footballSeason() },
@@ -1303,7 +1308,7 @@ function clubKey(raw) {
 
 function clubName(raw) {
   if (!raw) return "";
-  if (state.lang !== "ru") return raw;
+  if (!CONFIG.translateClubs || state.lang !== "ru") return raw;
   return CLUBS_RU[clubKey(raw)] || raw;
 }
 
@@ -1958,11 +1963,6 @@ async function fdTable(league) {
       });
     }
   }
-  // Зоны считаем внутри каждой группы отдельно
-  const perGroup = new Map();
-  for (const r of rows) perGroup.set(r.group, (perGroup.get(r.group) || 0) + 1);
-  for (const r of rows) r.zone = zoneByPosition(league.id, r.rank, perGroup.get(r.group));
-
   state.tableSource = "football-data.org";
   return rows;
 }
@@ -1989,13 +1989,41 @@ async function olTable(league) {
     group:  null,
     zone:   null
   }));
-  for (const r of rows) r.zone = zoneByPosition(league.id, r.rank, rows.length);
-
   state.tableSource = "OpenLigaDB";
   return rows;
 }
 
+/* Места нумеруем сами. API при равенстве очков нередко ставит командам
+   одинаковый номер — 5, 5, 7 — а в таблице нужен сплошной счёт.
+   Порядок строк при этом не трогаем: его источник уже выстроил
+   по своим правилам дополнительных показателей. */
+function renumber(rows) {
+  const perGroup = new Map();
+  for (const r of rows) {
+    const g = r.group || "";
+    const n = (perGroup.get(g) || 0) + 1;
+    perGroup.set(g, n);
+    r.rank = n;
+  }
+  return rows;
+}
+
+// Зону считаем после перенумерации — иначе она съедет на строку
+function fillZones(rows, leagueId) {
+  const sizes = new Map();
+  for (const r of rows) sizes.set(r.group || "", (sizes.get(r.group || "") || 0) + 1);
+  for (const r of rows) {
+    if (!r.zone) r.zone = zoneByPosition(leagueId, r.rank, sizes.get(r.group || ""));
+  }
+  return rows;
+}
+
 async function loadTable(league, sport) {
+  const rows = await loadTableRaw(league, sport);
+  return fillZones(renumber(rows), league.id);
+}
+
+async function loadTableRaw(league, sport) {
   state.fdError = null;
   if ((CONFIG.fdKey || CONFIG.fdProxy) && league.fdCode) {
     try { return await fdTable(league); }
@@ -2018,7 +2046,7 @@ async function loadTable(league, sport) {
       gf: r.all?.goals?.for || 0, ga: r.all?.goals?.against || 0,
       gd: Number(r.goalsDiff) || 0, points: r.points || 0,
       form: r.form || "", group: null,
-      zone: zoneOf(r.description) || zoneByPosition(league.id, r.rank, rows.length)
+      zone: zoneOf(r.description)
     }));
   }
 

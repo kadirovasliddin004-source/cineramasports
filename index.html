@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F2B417">
-<title>CSports — результаты и расписание: футбол, UFC, Формула-1</title>
+<title>CineramaSports — результаты и расписание: футбол, UFC, Формула-1</title>
 <meta name="description" content="Результаты матчей и расписание: Лига чемпионов, АПЛ, Ла Лига, Серия А, Бундеслига, Лига 1, UFC и Формула-1.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -760,6 +760,294 @@ footer{
 .k-line.k-bad b{color:var(--live)}
 
 /* ============================================================
+   Окно матча
+   Карточка матча стала ссылкой: клик открывает окно поверх
+   списка, кнопка «назад» его закрывает. Сигнатура окна —
+   золотая нить хода матча: минуты нанизаны на неё, голы
+   отчеканены так же, как счёт на карточке.
+   ============================================================ */
+a.match{cursor:pointer}
+a.match:focus-visible{outline:2px solid var(--gold-deep);outline-offset:2px;border-radius:var(--r)}
+
+.sr{
+  position:absolute;width:1px;height:1px;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;
+}
+body.mp-open{overflow:hidden}
+
+.mp{
+  position:fixed;inset:0;z-index:90;
+  display:grid;place-items:center;padding:var(--pad);
+  background:rgba(25,21,16,.45);
+  backdrop-filter:blur(3px);
+}
+.mp[hidden]{display:none}
+.mp-box{
+  position:relative;
+  width:100%;max-width:640px;
+  max-height:calc(100vh - 2 * var(--pad));
+  max-height:calc(100dvh - 2 * var(--pad));
+  overflow-y:auto;overscroll-behavior:contain;
+  background:var(--paper);
+  border:1px solid var(--line-2);border-radius:var(--r-lg);
+  box-shadow:0 24px 60px -20px rgba(93,66,8,.45);
+  outline:none;
+  animation:mp-in .22s ease-out;
+}
+@keyframes mp-in{from{opacity:0;transform:translateY(10px)}}
+@media (prefers-reduced-motion:reduce){.mp-box{animation:none}}
+
+.mp-top{
+  position:sticky;top:0;z-index:3;
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px 12px 22px;
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.mp-eyebrow{
+  flex:1;min-width:0;
+  font-family:var(--font-data);font-size:11px;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--gold-deep);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.mp-close{
+  width:36px;height:36px;flex:none;
+  display:grid;place-items:center;
+  background:var(--paper);
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--muted);
+  transition:color .18s ease, border-color .18s ease;
+}
+.mp-close:hover{color:var(--gold-deep);border-color:var(--gold)}
+
+/* шапка: команды и счёт */
+.mp-score{
+  display:grid;grid-template-columns:1fr auto 1fr;
+  align-items:start;gap:14px;
+  padding:24px 22px 10px;
+}
+.mp-team{display:grid;justify-items:center;gap:10px;text-align:center;min-width:0}
+/* На узких экранах сайт прячет эмблемы в карточках, а в окне они нужны */
+.mp-team .badge,.lu-team .badge{display:block}
+.mp-team .badge-fallback,.lu-team .badge-fallback{display:grid}
+.mp-team .badge,.mp-team .badge-fallback{width:56px;height:56px}
+.mp-team .badge-fallback{font-size:15px}
+.mp-team-name{
+  font-family:var(--font-display);font-weight:700;
+  font-size:15px;line-height:1.2;overflow-wrap:anywhere;
+}
+.mp-center{display:grid;justify-items:center;gap:8px;padding-top:6px}
+.mp-center .screen{min-width:118px;padding:10px 18px}
+.mp-center .screen .num{font-size:32px}
+.mp-center .screen .sep{font-size:24px}
+.mp-center .screen .clock{font-size:20px}
+.mp-status{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--font-data);font-size:11px;letter-spacing:.04em;
+  color:var(--muted);text-align:center;
+}
+.mp-status--live{color:var(--live);font-weight:700}
+.mp-when{font-size:12.5px;color:var(--muted);text-align:center}
+
+/* кто забил — под своей командой */
+.mp-scorers{
+  display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;
+  padding:4px 22px 18px;
+}
+.mp-sc{list-style:none;display:grid;gap:3px;align-content:start;font-size:12.5px;color:var(--muted)}
+.mp-sc--home{text-align:right}
+.mp-sc b{color:var(--ink);font-weight:600}
+.mp-sc .ic{width:12px;height:12px;vertical-align:-1px;margin:0 3px}
+.mp-known{
+  grid-column:1 / -1;justify-self:center;margin-top:6px;
+  font-family:var(--font-data);font-size:11px;color:var(--gold-deep);
+}
+
+/* вкладки окна — как вкладки раздела на странице */
+.mp-tabs{
+  display:flex;justify-content:center;gap:24px;
+  padding:0 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+}
+.mp-tabs button{
+  position:relative;padding:12px 0 11px;
+  font-family:var(--font-display);font-weight:500;
+  font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);transition:color .18s ease;
+}
+.mp-tabs button:hover{color:var(--ink)}
+.mp-tabs button[aria-selected="true"]{color:var(--ink)}
+.mp-tabs button[aria-selected="true"]::after{
+  content:'';position:absolute;left:0;right:0;bottom:-1px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--gold),var(--gold-edge));
+}
+
+.mp-body{padding:20px 22px 24px}
+.mp-body .hint{margin-top:16px}
+.mp-skel{display:grid;gap:8px}
+.mp-skel .skel{height:40px}
+.mp-notice{padding:30px 20px}
+
+/* --- ход матча: золотая нить посередине --- */
+.tl{position:relative;display:grid;gap:2px}
+.tl::before{
+  content:'';position:absolute;top:14px;bottom:14px;left:50%;
+  width:2px;margin-left:-1px;border-radius:1px;
+  background:linear-gradient(var(--gold-soft),var(--gold) 10%,var(--gold) 90%,var(--gold-soft));
+}
+.tl-row{
+  position:relative;
+  display:grid;grid-template-columns:1fr 54px 1fr;
+  align-items:center;min-height:44px;
+}
+.tl-min{
+  grid-column:2;grid-row:1;justify-self:center;z-index:1;
+  display:grid;justify-items:center;gap:1px;
+  min-width:42px;padding:4px 6px;border-radius:100px;
+  background:var(--paper);border:1.5px solid var(--gold);
+  font-family:var(--font-data);font-variant-numeric:tabular-nums;
+  color:var(--gold-deep);line-height:1.1;
+}
+.tl-min b{font-size:11.5px;font-weight:700}
+.tl-min span{font-size:10.5px;font-weight:700;color:#33240A}
+.tl-row--goal .tl-min{
+  border-radius:10px;padding:5px 7px;
+  background:linear-gradient(160deg,#FFDD6E,var(--gold) 48%,var(--gold-edge));
+  border-color:var(--gold-edge);color:#33240A;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 1px 3px rgba(154,107,4,.3);
+}
+.tl-ev{grid-row:1;display:flex;align-items:center;gap:10px;min-width:0}
+.tl-ev--home{grid-column:1;justify-content:flex-end;text-align:right;padding-right:12px}
+.tl-ev--away{grid-column:3;justify-content:flex-start;text-align:left;padding-left:12px}
+.tl-who{display:grid;gap:1px;min-width:0}
+.tl-who b{font-weight:600;font-size:13.5px;line-height:1.25;overflow-wrap:anywhere}
+.tl-who small{font-size:11.5px;line-height:1.3;color:var(--muted)}
+.tl-row--goal .tl-who b{font-weight:700}
+.tl-ic{flex:none;display:inline-flex;align-items:center}
+.tl-row--mark{min-height:36px}
+.tl-mark{
+  grid-column:1 / -1;grid-row:1;justify-self:center;z-index:1;
+  padding:4px 12px;border-radius:100px;
+  background:var(--sand);border:1px solid var(--line-2);
+  font-family:var(--font-data);font-size:10.5px;letter-spacing:.06em;
+  color:var(--muted);white-space:nowrap;
+}
+.tl-mark b{color:var(--ink);margin-left:4px}
+
+/* значки событий */
+.ic{width:16px;height:16px;flex:none;color:var(--ink);display:inline-block}
+.ic--own{color:var(--live)}
+.ic--miss{color:var(--muted)}
+.ic-card{
+  display:inline-block;flex:none;width:10px;height:14px;border-radius:2px;
+  transform:rotate(-8deg);box-shadow:0 1px 1px rgba(25,21,16,.2);
+}
+.ic-card--y{background:#F7DC2B}
+.ic-card--r{background:var(--live)}
+.ic-card--yr{background:var(--live);box-shadow:-3px -2px 0 #F7DC2B, 0 1px 1px rgba(25,21,16,.2)}
+.ic-var{
+  flex:none;display:inline-block;padding:2px 3px;
+  border:1px solid var(--ink);border-radius:3px;
+  font-family:var(--font-data);font-style:normal;font-size:8.5px;font-weight:700;
+  letter-spacing:.04em;line-height:1;color:var(--ink);
+}
+
+/* --- статистика --- */
+.st{display:grid;gap:15px}
+.st-row{display:grid;gap:6px}
+.st-head{display:grid;grid-template-columns:minmax(3ch,auto) 1fr minmax(3ch,auto);align-items:baseline;gap:10px}
+.st-val{
+  font-family:var(--font-data);font-size:13px;font-weight:500;
+  font-variant-numeric:tabular-nums;color:var(--muted);
+}
+.st-val:last-child{text-align:right}
+.st-val--lead{color:var(--ink);font-weight:700}
+.st-name{text-align:center;font-size:12.5px;color:var(--muted)}
+.st-bars{display:grid;grid-template-columns:1fr 1fr;gap:4px;height:6px}
+.st-bar{display:flex;overflow:hidden;border-radius:3px;background:#F1ECDF}
+.st-bar--home{justify-content:flex-end}
+.st-bar i{display:block;height:100%;border-radius:3px;background:#D8CFBC}
+.st-bar i.lead{background:linear-gradient(90deg,var(--gold),var(--gold-edge))}
+
+/* --- составы --- */
+.lu{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.lu-team{
+  display:flex;align-items:center;gap:8px;margin-bottom:12px;
+  font-family:var(--font-display);font-weight:700;font-size:13px;line-height:1.2;
+}
+.lu-team .badge,.lu-team .badge-fallback{width:22px;height:22px}
+.lu-form{margin-left:auto;font-family:var(--font-data);font-size:11px;font-weight:500;color:var(--gold-deep)}
+.lu-h{
+  margin:0 0 4px;
+  font-family:var(--font-data);font-size:10.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+}
+.lu-h--bench{margin-top:18px}
+.lu-list{list-style:none}
+.lu-p{
+  display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:8px;
+  padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;
+}
+.lu-num{
+  font-family:var(--font-data);font-size:11.5px;font-weight:700;
+  text-align:right;color:var(--gold-deep);font-variant-numeric:tabular-nums;
+}
+.lu-name{min-width:0;line-height:1.3;overflow-wrap:anywhere}
+.lu-pos{font-family:var(--font-data);font-size:10.5px;color:var(--muted);cursor:help}
+.lu-ev{display:inline-flex;align-items:center;gap:4px;margin-left:6px;vertical-align:-2px}
+.lu-ev .ic{width:13px;height:13px}
+.lu-ev .ic-card{width:8px;height:11px}
+.lu-sub{font-family:var(--font-data);font-size:10.5px;font-weight:700}
+.lu-sub--in{color:#1B8A4B}
+.lu-sub--out{color:var(--live)}
+.lu-empty{color:var(--muted)}
+
+/* подвал окна: обзор и стадион */
+.mp-foot{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;
+  padding:16px 22px 22px;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--muted);
+}
+.mp-video{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 18px;border-radius:100px;
+  background:linear-gradient(160deg,#FFDD6E,var(--gold) 55%,var(--gold-edge));
+  border:1px solid var(--gold-edge);
+  color:var(--ink);font-weight:700;font-size:13px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+.mp-video:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.6), var(--shadow-up)}
+.mp-venue{display:inline-flex;align-items:center;gap:6px}
+
+@media (max-width:600px){
+  .mp{padding:0;place-items:stretch}
+  .mp-box{max-width:none;max-height:none;height:100%;border:none;border-radius:0}
+  .mp-top{padding:10px 10px 10px 16px}
+  .mp-score{padding:18px 12px 8px;gap:8px}
+  .mp-team .badge,.mp-team .badge-fallback{width:44px;height:44px}
+  .mp-team-name{font-size:13px}
+  .mp-center .screen{min-width:94px;padding:8px 12px}
+  .mp-center .screen .num{font-size:26px}
+  .mp-center .screen .sep{font-size:20px}
+  .mp-center .screen .clock{font-size:17px}
+  .mp-scorers{padding:2px 14px 16px;gap:4px 16px}
+  .mp-sc{font-size:12px}
+  .mp-tabs{gap:18px}
+  .mp-tabs button{font-size:11px}
+  .mp-body{padding:16px 12px 22px}
+  .tl-row{grid-template-columns:1fr 48px 1fr}
+  .tl-ev{gap:7px}
+  .tl-ev--home{padding-right:8px}
+  .tl-ev--away{padding-left:8px}
+  .tl-who b{font-size:12.5px}
+  .tl-who small{font-size:11px}
+  .lu{gap:14px}
+  .lu-p{grid-template-columns:20px 1fr;gap:6px;font-size:12.5px}
+  .lu-pos{display:none}
+  .mp-foot{padding:14px 14px 22px}
+}
+
+/* ============================================================
    Адаптив
    ============================================================ */
 @media (max-width:760px){
@@ -798,9 +1086,9 @@ footer{
 
 <header class="topbar">
   <div class="wrap topbar-inner">
-    <a class="brand" href="#" aria-label="CSports">
+    <a class="brand" href="#" aria-label="CineramaSports">
       <span class="brand-lamp" aria-hidden="true"></span>
-      <span class="brand-name" id="brand-name">CSports</span>
+      <span class="brand-name" id="brand-name">CineramaSports</span>
     </a>
 
     <nav class="sportnav" role="tablist" id="sportnav"></nav>
@@ -870,6 +1158,13 @@ footer{
       <button class="k-ghost" id="k-forget"></button>
       <button class="k-ghost" id="k-close"></button>
     </div>
+  </div>
+</div>
+
+<!-- Окно матча: наполняется скриптом, открывается по адресу …/match/<id> -->
+<div class="mp" id="mp" hidden>
+  <div class="mp-box" role="dialog" aria-modal="true" tabindex="-1">
+    <div id="mp-content"></div>
   </div>
 </div>
 
@@ -981,7 +1276,7 @@ const SPORTS = [
 const I18N = {
   ru: {
     htmlLang: "ru",
-    brand: "CSports",
+    brand: "CineramaSports",
     tagline: "результаты и расписание",
     footerNote: "время указано в вашем часовом поясе",
     refresh: "Обновить данные",
@@ -1094,6 +1389,75 @@ const I18N = {
     tbd: "дата уточняется",
     th:      { pos: "#", team: "Команда", p: "И", w: "В", d: "Н", l: "П", goals: "Мячи", gd: "±", pts: "О" },
     thTitle: { p: "Игры", w: "Выигрыши", d: "Ничьи", l: "Поражения", goals: "Забито : пропущено", gd: "Разница мячей", pts: "Очки" },
+    // Окно матча
+    mp: {
+      open: "Подробности матча",
+      close: "Закрыть",
+      tabs: { events: "Ход матча", stats: "Статистика", lineups: "Составы" },
+      finished: "Матч завершён",
+      notStarted: "Матч ещё не начался",
+      postponed: "Матч перенесён",
+      kickoff: "Начало матча",
+      halfTime: "Перерыв",
+      fullTime: "Финальный свисток",
+      assist: (n) => `пас: ${n}`,
+      penalty: "с пенальти",
+      penShort: "пен.",
+      ownGoal: "автогол",
+      missed: "не забил пенальти",
+      secondYellow: "вторая жёлтая",
+      sentOff: "удаление",
+      subFor: (n) => `вместо ${n}`,
+      goalsKnown: (k, n) => `Голов в списке: ${k} из ${n}`,
+      cutEvents: "Бесплатный ключ TheSportsDB отдаёт только первые 5 событий матча, поэтому конец матча здесь не виден.",
+      cutStats: "Бесплатный ключ TheSportsDB отдаёт только 5 показателей статистики.",
+      noEventsTitle: "Событий нет",
+      noEventsText: "Источник не прислал голов, карточек и замен этого матча.",
+      notStartedText: "Голы, карточки и замены появятся здесь, когда матч начнётся.",
+      noStatsTitle: "Статистики нет",
+      noStatsText: "Источник не прислал статистику этого матча.",
+      starting: "Стартовый состав",
+      bench: "Запасные",
+      video: "Смотреть обзор",
+      demo: "Это демо-матч: API не ответил, поэтому подробностей нет.",
+      unsupported: "Подробности матча пока работают только с TheSportsDB.",
+      failTitle: "Подробности не загрузились",
+      kind: {
+        goal: "Гол", pen: "Гол с пенальти", own: "Автогол", miss: "Незабитый пенальти",
+        yellow: "Жёлтая карточка", yellow2: "Вторая жёлтая карточка", red: "Красная карточка",
+        sub: "Замена", var: "VAR"
+      },
+      pos: { G: "Вр", D: "Защ", M: "ПЗ", F: "Нап" },
+      posFull: { G: "Вратарь", D: "Защитник", M: "Полузащитник", F: "Нападающий" },
+      var: {
+        goalOff: "гол отменён", goalOn: "гол засчитан",
+        penOff: "пенальти отменён", penOn: "пенальти назначен",
+        card: "пересмотр карточки", check: "проверка VAR",
+        offside: "офсайд", handball: "игра рукой", foul: "фол"
+      },
+      // Причины карточек. Незнакомые не показываем, чтобы не мешать языки
+      reason: {
+        "foul": "фол", "argument": "спор с судьёй", "dissent": "спор с судьёй",
+        "time wasting": "затягивание времени", "handball": "игра рукой",
+        "unsportsmanlike conduct": "неспортивное поведение", "simulation": "симуляция",
+        "professional foul": "срыв атаки", "professional foul last man": "фол последней надежды",
+        "violent conduct": "грубость", "serious foul play": "грубая игра", "roughing": "грубость",
+        "holding": "задержка соперника", "tripping": "подножка", "pushing": "толчок",
+        "elbowing": "удар локтем", "excessive celebration": "празднование гола",
+        "persistent fouling": "систематические нарушения", "dangerous play": "опасная игра"
+      },
+      stat: {
+        "ball possession": "Владение мячом", "expected_goals": "Ожидаемые голы (xG)",
+        "total shots": "Удары", "shots on goal": "Удары в створ", "shots off goal": "Удары мимо",
+        "blocked shots": "Заблокированные удары", "shots insidebox": "Удары из штрафной",
+        "shots outsidebox": "Удары из-за штрафной", "corner kicks": "Угловые",
+        "offsides": "Офсайды", "fouls": "Фолы", "free kicks": "Штрафные удары",
+        "yellow cards": "Жёлтые карточки", "red cards": "Красные карточки",
+        "goalkeeper saves": "Сейвы вратаря", "total passes": "Передачи",
+        "passes accurate": "Точные передачи", "passes %": "Точность передач",
+        "goals_prevented": "Предотвращённые голы"
+      }
+    },
     stage: {
       matchday:     (n) => ({ big: n, unit: "тур",  full: `${n}-й тур` }),
       leaguePhase:  (n) => ({ big: n, unit: "тур",  full: `Общий этап, ${n}-й тур`, note: "Общий этап" }),
@@ -1112,7 +1476,7 @@ const I18N = {
 
   uz: {
     htmlLang: "uz",
-    brand: "CSports",
+    brand: "CineramaSports",
     tagline: "natijalar va jadval",
     footerNote: "vaqt sizning vaqt mintaqangizda",
     refresh: "Ma'lumotlarni yangilash",
@@ -1225,6 +1589,75 @@ const I18N = {
     tbd: "sana aniqlanmagan",
     th:      { pos: "#", team: "Jamoa", p: "O'Y", w: "G'", d: "D", l: "M", goals: "Gollar", gd: "±", pts: "OCH" },
     thTitle: { p: "O'yinlar", w: "G'alabalar", d: "Duranglar", l: "Mag'lubiyatlar", goals: "Urilgan : o'tkazilgan", gd: "Gollar farqi", pts: "Ochko" },
+    mp: {
+      open: "O'yin tafsilotlari",
+      close: "Yopish",
+      tabs: { events: "O'yin borishi", stats: "Statistika", lineups: "Tarkiblar" },
+      finished: "O'yin yakunlandi",
+      notStarted: "O'yin hali boshlanmagan",
+      postponed: "O'yin qoldirildi",
+      kickoff: "O'yin boshlandi",
+      halfTime: "Tanaffus",
+      fullTime: "Yakuniy hushtak",
+      assist: (n) => `uzatma: ${n}`,
+      penalty: "penaltidan",
+      penShort: "pen.",
+      ownGoal: "avtogol",
+      missed: "penaltini amalga oshirmadi",
+      secondYellow: "ikkinchi sariq kartochka",
+      sentOff: "chetlatish",
+      subFor: (n) => `${n} o'rniga`,
+      goalsKnown: (k, n) => `Ro'yxatdagi gollar: ${n} tadan ${k} tasi`,
+      cutEvents: "TheSportsDB bepul kaliti o'yinning faqat dastlabki 5 ta voqeasini beradi, shuning uchun o'yin oxiri bu yerda ko'rinmaydi.",
+      cutStats: "TheSportsDB bepul kaliti statistikaning faqat 5 ta ko'rsatkichini beradi.",
+      noEventsTitle: "Voqealar yo'q",
+      noEventsText: "Manba bu o'yinning gollari, kartochkalari va almashtirishlarini yubormadi.",
+      notStartedText: "Gollar, kartochkalar va almashtirishlar o'yin boshlanganda shu yerda paydo bo'ladi.",
+      noStatsTitle: "Statistika yo'q",
+      noStatsText: "Manba bu o'yin statistikasini yubormadi.",
+      starting: "Asosiy tarkib",
+      bench: "Zaxira o'yinchilari",
+      video: "Obzorni ko'rish",
+      demo: "Bu namoyish o'yini: API javob bermadi, shuning uchun tafsilotlar yo'q.",
+      unsupported: "O'yin tafsilotlari hozircha faqat TheSportsDB bilan ishlaydi.",
+      failTitle: "Tafsilotlar yuklanmadi",
+      kind: {
+        goal: "Gol", pen: "Penaltidan gol", own: "Avtogol", miss: "Amalga oshirilmagan penalti",
+        yellow: "Sariq kartochka", yellow2: "Ikkinchi sariq kartochka", red: "Qizil kartochka",
+        sub: "Almashtirish", var: "VAR"
+      },
+      pos: { G: "Dar", D: "Him", M: "YH", F: "Huj" },
+      posFull: { G: "Darvozabon", D: "Himoyachi", M: "Yarim himoyachi", F: "Hujumchi" },
+      var: {
+        goalOff: "gol bekor qilindi", goalOn: "gol tasdiqlandi",
+        penOff: "penalti bekor qilindi", penOn: "penalti belgilandi",
+        card: "kartochka qayta ko'rib chiqildi", check: "VAR tekshiruvi",
+        offside: "o'yindan tashqari holat", handball: "qo'l bilan o'ynash", foul: "qoidabuzarlik"
+      },
+      reason: {
+        "foul": "qoidabuzarlik", "argument": "hakam bilan bahs", "dissent": "hakam bilan bahs",
+        "time wasting": "vaqtni cho'zish", "handball": "qo'l bilan o'ynash",
+        "unsportsmanlike conduct": "nosportchilik xatti-harakati", "simulation": "simulyatsiya",
+        "professional foul": "hujumni to'xtatish", "professional foul last man": "so'nggi imkoniyatda qoidabuzarlik",
+        "violent conduct": "qo'pollik", "serious foul play": "qo'pol o'yin", "roughing": "qo'pollik",
+        "holding": "raqibni ushlab qolish", "tripping": "oyoq qo'yish", "pushing": "itarish",
+        "elbowing": "tirsak bilan urish", "excessive celebration": "golni nishonlash",
+        "persistent fouling": "muntazam qoidabuzarlik", "dangerous play": "xavfli o'yin"
+      },
+      stat: {
+        "ball possession": "To'p nazorati", "expected_goals": "Kutilgan gollar (xG)",
+        "total shots": "Zarbalar", "shots on goal": "Darvozaga aniq zarbalar",
+        "shots off goal": "Darvozadan tashqariga zarbalar", "blocked shots": "To'sib qolingan zarbalar",
+        "shots insidebox": "Jarima maydonchasi ichidan zarbalar",
+        "shots outsidebox": "Jarima maydonchasi tashqarisidan zarbalar",
+        "corner kicks": "Burchak to'plari", "offsides": "O'yindan tashqari holatlar",
+        "fouls": "Qoidabuzarliklar", "free kicks": "Jarima zarbalari",
+        "yellow cards": "Sariq kartochkalar", "red cards": "Qizil kartochkalar",
+        "goalkeeper saves": "Darvozabon qaytargan zarbalar", "total passes": "Uzatmalar",
+        "passes accurate": "Aniq uzatmalar", "passes %": "Uzatmalar aniqligi",
+        "goals_prevented": "Oldi olingan gollar"
+      }
+    },
     stage: {
       matchday:     (n) => ({ big: n, unit: "tur",    full: `${n}-tur` }),
       leaguePhase:  (n) => ({ big: n, unit: "tur",    full: `Umumiy bosqich, ${n}-tur`, note: "Umumiy bosqich" }),
@@ -1342,6 +1775,7 @@ const state = {
   round: null,                              // выбранный тур, null = определить сам
   calMonth: startOfMonth(new Date()),       // какой месяц показан в календаре
   calDay: null,                             // выбранная дата
+  matchId: null,                            // открытый матч, null = окно закрыто
   dayIndex: new Map()                       // "2026-08-24" -> сколько матчей, для точек
 };
 
@@ -1503,8 +1937,10 @@ class ApiError extends Error {
 
 const isFileOrigin = () => location.protocol === "file:";
 
+const tsdbUrl = (path) => `${CONFIG.base}/${CONFIG.apiKey}/${path}`;
+
 async function getJSON(path) {
-  const url = `${CONFIG.base}/${CONFIG.apiKey}/${path}`;
+  const url = tsdbUrl(path);
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < CONFIG.cacheTtl) return hit.data;
 
@@ -1728,21 +2164,39 @@ function normalizeEvent(ev, sport, league) {
   const status = String(ev.strStatus || "").toUpperCase();
 
   return {
+    src: "tsdb",
     id: ev.idEvent,
     title: ev.strEvent || "",
     home: ev.strHomeTeam || "",
     away: ev.strAwayTeam || "",
+    homeId: ev.idHomeTeam || "",
+    awayId: ev.idAwayTeam || "",
     homeBadge: ev.strHomeTeamBadge || "",
     awayBadge: ev.strAwayTeamBadge || "",
     homeScore: hasScore ? Number(hs) : null,
     awayScore: hasScore ? Number(as) : null,
     stage: stageFromTSDB(ev.intRound, sport.id, league.id),
+    leagueId: ev.idLeague || league.id,
+    leagueName: ev.strLeague || "",
     venue: ev.strVenue || "",
+    video: safeVideo(ev.strVideo),
     date,
     ts: date ? date.getTime() : 0,
     live: ["1H", "2H", "HT", "ET", "P", "BT"].includes(status),
+    postponed: String(ev.strPostponed || "").toLowerCase() === "yes" || ["PST", "POSTP"].includes(status),
     finished: hasScore || ["FT", "AET", "PEN"].includes(status)
   };
+}
+
+/* Ссылка на обзор попадает в href, поэтому пропускаем только YouTube:
+   адрес вида javascript:… выполнился бы по клику. */
+function safeVideo(raw) {
+  try {
+    const u = new URL(String(raw || ""));
+    if (u.protocol !== "https:" && u.protocol !== "http:") return "";
+    const host = u.hostname.replace(/^(www|m)\./, "");
+    return host === "youtube.com" || host === "youtu.be" ? u.href : "";
+  } catch (e) { return ""; }
 }
 
 function normalizeAF(f) {
@@ -1752,6 +2206,7 @@ function normalizeAF(f) {
   const hasScore = hs !== null && hs !== undefined && as !== null && as !== undefined;
 
   return {
+    src: "af",
     id: String(f.fixture?.id ?? ""),
     title: `${f.teams?.home?.name || ""} - ${f.teams?.away?.name || ""}`,
     home: f.teams?.home?.name || "",
@@ -2125,6 +2580,151 @@ async function loadTableRaw(league, sport) {
   }));
 }
 
+/* --- Подробности матча ---
+   TheSportsDB отдаёт ход матча, статистику и составы тремя запросами.
+   Бесплатный ключ 123 обрезает каждый ответ до 5 записей, платный — до 100,
+   этого хватает на любой матч. Записи идут по времени, поэтому на
+   бесплатном ключе пропадает конец матча: в игре 5:3 видны 4 гола из 8
+   (проверено на живых запросах). Поэтому обрезку всегда подписываем. */
+const TSDB_FREE_KEY = "123";
+const TSDB_FREE_CAP = 5;
+const tsdbFree = () => CONFIG.apiKey === TSDB_FREE_KEY;
+
+const GOAL_TYPES = ["goal", "pen", "own"];
+const detailCache = new Map();             // id матча → { at, ttl, data }
+const matchIndex = new Map();              // id → матч из уже показанных списков
+
+// В ответах API пустое значение бывает и null, и строкой "NULL"
+const blank = (v) => v === null || v === undefined || String(v).trim() === "" ||
+                     String(v).trim().toUpperCase() === "NULL";
+
+function leagueById(id) {
+  for (const s of SPORTS) for (const l of s.leagues) if (l.id === String(id)) return l;
+  return null;
+}
+
+function tsdbSide(r, match) {
+  const h = String(r.strHome || "").toLowerCase();
+  if (h === "yes") return "home";
+  if (h === "no") return "away";
+  return match && String(r.idTeam) === String(match.homeId) ? "home" : "away";
+}
+
+function tsdbEvent(r, i, match) {
+  const kind = String(r.strTimeline || "").toLowerCase();
+  const detail = String(r.strTimelineDetail || "").toLowerCase();
+  let type;
+  if (kind === "goal") {
+    // «Missed Penalty» приходит как гол — это не гол
+    type = detail.includes("miss") ? "miss"
+         : detail.includes("own") ? "own"
+         : detail.includes("pen") ? "pen" : "goal";
+  } else if (kind === "card") {
+    type = detail.includes("second") ? "yellow2"
+         : detail.includes("red") ? "red" : "yellow";
+  } else if (kind.startsWith("subst")) {
+    type = "sub";
+  } else if (kind === "var") {
+    type = "var";
+  } else {
+    return null;                           // незнакомый тип не выдумываем
+  }
+  const min = parseInt(r.intTime, 10);
+  return {
+    i, type,
+    side: tsdbSide(r, match),               // у автогола это команда, которой его засчитали
+    min: Number.isFinite(min) ? min : null,
+    player: blank(r.strPlayer) ? "" : String(r.strPlayer),
+    // У гола здесь автор передачи. У замены strPlayer — кто ушёл,
+    // strAssist — кто вышел: Ивоби в стартовом составе, а в замене он в strPlayer
+    other: blank(r.strAssist) ? "" : String(r.strAssist),
+    comment: blank(r.strComment) ? "" : String(r.strComment),
+    detail: String(r.strTimelineDetail || "")
+  };
+}
+
+function statRow(key, hv, av) {
+  const label = String(key || "").trim();
+  if (!label || (blank(hv) && blank(av))) return null;
+  const num = (v) => { const n = parseFloat(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
+  const show = (v) => blank(v) ? "0" : String(v).trim();
+  return { key: label.toLowerCase(), label, home: show(hv), away: show(av), h: num(hv), a: num(av) };
+}
+
+// Линия на поле по названию позиции: вратарь, защита, полузащита, атака
+function posLine(raw) {
+  const p = String(raw || "").toLowerCase();
+  if (!p) return "";
+  if (p.includes("goal")) return "G";
+  // Полузащиту проверяем раньше защиты: «Defensive Midfield» — это опорник
+  if (p.includes("midfield")) return "M";
+  if (p.includes("back") || p.includes("defen")) return "D";
+  if (p.includes("wing") || p.includes("forward") || p.includes("striker")) return "F";
+  return "";
+}
+const LINE_RANK = { G: 0, D: 1, M: 2, F: 3, "": 4 };
+
+function tsdbLineups(rows, match) {
+  const team = () => ({ start: [], bench: [], formation: "" });
+  const out = { home: team(), away: team() };
+  for (const r of rows) {
+    if (blank(r.strPlayer)) continue;
+    const p = {
+      num: blank(r.intSquadNumber) ? "" : String(r.intSquadNumber),
+      name: String(r.strPlayer),
+      line: posLine(r.strPosition)
+    };
+    const s = out[tsdbSide(r, match)];
+    (String(r.strSubstitute || "").toLowerCase() === "yes" ? s.bench : s.start).push(p);
+  }
+  for (const s of [out.home, out.away]) s.start.sort((a, b) => LINE_RANK[a.line] - LINE_RANK[b.line]);
+  return out;
+}
+
+async function matchDetails(id, known, force) {
+  const hit = detailCache.get(id);
+  if (!force && hit && Date.now() - hit.at < hit.ttl) return hit.data;
+
+  const paths = [
+    `lookupevent.php?id=${id}`,
+    `lookuptimeline.php?id=${id}`,
+    `lookupeventstats.php?id=${id}`,
+    `lookuplineup.php?id=${id}`
+  ];
+  if (force) for (const p of paths) cache.delete(tsdbUrl(p));
+
+  // Сам матч спрашиваем, только если его нет в уже загруженных списках —
+  // например, когда окно открыли по ссылке. Так выходит на запрос меньше.
+  const [ev, tl, st, lu] = await Promise.allSettled([
+    known ? Promise.resolve(null) : getJSON(paths[0]),
+    getJSON(paths[1]), getJSON(paths[2]), getJSON(paths[3])
+  ]);
+
+  let match = known;
+  if (!match && ev.status === "fulfilled") {
+    const e = (ev.value?.events || [])[0];
+    if (e) match = normalizeEvent(e, SPORTS[0], leagueById(e.idLeague) || state.league);
+  }
+  if (!match) throw ev.status === "rejected" ? ev.reason : new ApiError("empty", "lookupevent");
+  if ([tl, st, lu].every((p) => p.status === "rejected")) throw tl.reason;
+
+  const list = (p, key) => p.status === "fulfilled" && Array.isArray(p.value?.[key]) ? p.value[key] : [];
+  const tlRaw = list(tl, "timeline"), stRaw = list(st, "eventstats"), luRaw = list(lu, "lineup");
+  const limit = tsdbFree() ? TSDB_FREE_CAP : Infinity;
+
+  const data = {
+    match,
+    events: tlRaw.map((r, i) => tsdbEvent(r, i, match)).filter(Boolean),
+    stats: stRaw.map((r) => statRow(r.strStat, r.intHome, r.intAway)).filter(Boolean),
+    lineups: tsdbLineups(luRaw, match),
+    // Ровно столько записей, сколько разрешает ключ, — значит, ответ обрезан
+    cut: { events: tlRaw.length >= limit, stats: stRaw.length >= limit, lineups: luRaw.length >= limit }
+  };
+  // Сыгранный матч уже не изменится — держим дольше
+  detailCache.set(id, { at: Date.now(), ttl: match.finished ? 30 * 60_000 : 60_000, data });
+  return data;
+}
+
 /* ============================================================
    7. ДЕМО-ДАННЫЕ
    Показываются, только когда API недоступен. Имена клубов взяты
@@ -2228,6 +2828,7 @@ function demoMatches(leagueId, past) {
       ? (past ? { kind: "playoff" } : { kind: "leaguePhase", n: 1 })
       : { kind: "matchday", n: past ? Math.max(1, 4 - dayOffset) : 4 + dayOffset };
     out.push({
+      src: "demo",
       id: `demo-${leagueId}-${past ? "p" : "n"}-${i}`,
       title: `${home} - ${away}`, home, away, homeBadge: "", awayBadge: "",
       homeScore: past ? Math.floor(seeded(i + Number(leagueId)) * 4) : null,
@@ -2285,6 +2886,7 @@ function demoRound(leagueId, n) {
     const date = demoDate(-(3 - dayShift), 17 + (i % 3) * 2);
     const past = date.getTime() < Date.now();
     out.push({
+      src: "demo",
       id: `demo-round-${leagueId}-${n}-${i}`,
       title: `${home} - ${away}`, home, away, homeBadge: "", awayBadge: "",
       homeScore: past ? Math.floor(seeded(i + n * 3) * 4) : null,
@@ -2487,8 +3089,13 @@ function matchHTML(m, upcoming) {
   if (note)   foot.push(`<span class="tag">${esc(note)}</span>`);
   if (m.venue) foot.push(`<span class="tag">${esc(m.venue)}</span>`);
 
+  // Карточка — ссылка на окно матча: «назад» его закроет, ссылкой можно поделиться
+  const id = String(m.id || "");
+  const link = MATCH_ID.test(id);
+  const open = link ? `<a class="match" href="${esc(matchHref(id))}" data-mid="${esc(id)}">` : `<article class="match">`;
+
   return `
-  <article class="match">
+  ${open}
     <div class="rail">${railHTML(m)}</div>
     <div class="row">
       <div class="side side--home">
@@ -2502,7 +3109,7 @@ function matchHTML(m, upcoming) {
       </div>
     </div>
     ${foot.length ? `<div class="foot">${foot.join("")}</div>` : ""}
-  </article>`;
+  ${link ? "</a>" : "</article>"}`;
 }
 
 function eventHTML(m, upcoming) {
@@ -2525,6 +3132,9 @@ function eventHTML(m, upcoming) {
 
 function renderList(items, sport, upcoming, flat) {
   if (!items.length) return notice(t().emptyTitle, t().emptyText);
+
+  // Запоминаем показанные матчи: окно откроется сразу, без лишнего запроса
+  if (sport.kind === "match") for (const m of items) if (m.id) matchIndex.set(String(m.id), m);
 
   if (sport.kind === "event") {
     return `<div class="list">${items.map((m) => eventHTML(m, upcoming)).join("")}</div>`;
@@ -2762,6 +3372,310 @@ function notice(title, text, retry) {
 
 const skeleton = () => `<div class="list">${'<div class="skel"></div>'.repeat(6)}</div>`;
 
+/* ---------- Окно матча ---------- */
+
+const IC_X = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>`;
+const IC_PLAY = `<svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>`;
+const IC_PIN = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>`;
+const IC_SUB = `<svg class="ic" viewBox="0 0 16 16" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13V3M2.2 5.8 5 3l2.8 2.8" stroke="#1B8A4B"/><path d="M11 3v10M8.2 10.2 11 13l2.8-2.8" stroke="#D6280F"/></svg>`;
+
+// Мяч: пятиугольник в центре и пять заплаток по краю
+function ballIcon(cls, crossed) {
+  return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 16 16" aria-hidden="true">` +
+    `<circle cx="8" cy="8" r="7" fill="#fff"/>` +
+    `<path fill="currentColor" d="M8 5.3l2.57 1.87-.98 3.01H6.41l-.98-3.01zM8 3.6 5.15 1.61h5.7zM12.18 6.64l1.02-3.32 1.76 5.41zM10.59 11.56l3.47-.06-4.6 3.35zM5.41 11.56l1.13 3.29-4.6-3.35zM3.82 6.64 1.04 8.73l1.76-5.41z"/>` +
+    `<path stroke="currentColor" stroke-width="1" d="M8 5.3V3.6M10.57 7.17l1.61-.53M9.59 10.18l1 1.38M6.41 10.18l-1 1.38M5.43 7.17l-1.61-.53"/>` +
+    `<circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.2"/>` +
+    (crossed ? `<path d="M2.5 13.5 13.5 2.5" stroke="#D6280F" stroke-width="1.8" stroke-linecap="round"/>` : "") +
+    `</svg>`;
+}
+
+function eventIcon(type) {
+  switch (type) {
+    case "goal": case "pen": return ballIcon("");
+    case "own":     return ballIcon("ic--own");
+    case "miss":    return ballIcon("ic--miss", true);
+    case "yellow":  return `<i class="ic-card ic-card--y" aria-hidden="true"></i>`;
+    case "red":     return `<i class="ic-card ic-card--r" aria-hidden="true"></i>`;
+    case "yellow2": return `<i class="ic-card ic-card--yr" aria-hidden="true"></i>`;
+    case "sub":     return IC_SUB;
+    case "var":     return `<i class="ic-var" aria-hidden="true">VAR</i>`;
+  }
+  return "";
+}
+
+const reasonText = (c) => t().mp.reason[String(c || "").trim().toLowerCase()] || "";
+
+function varText(raw) {
+  const V = t().mp.var, d = String(raw || "").toLowerCase();
+  const why = d.includes("offside") ? V.offside : d.includes("hand") ? V.handball : d.includes("foul") ? V.foul : "";
+  const what = d.includes("goal") ? (/cancel|disallow/.test(d) ? V.goalOff : V.goalOn)
+    : d.includes("penalty") ? (/cancel/.test(d) ? V.penOff : V.penOn)
+    : d.includes("card") ? V.card : V.check;
+  return why ? `${what} (${why})` : what;
+}
+
+function mpNotice(title, text, retry) {
+  return `<div class="notice mp-notice"><b>${esc(title)}</b>${esc(text)}${
+    retry ? `<br><button data-mp-retry>${esc(t().retry)}</button>` : ""}</div>`;
+}
+
+function mpHeadHTML(m, d) {
+  const L = t(), M = L.mp;
+  const plateOf = (a, b, cls) =>
+    `<div class="screen ${cls}"><span class="num">${a}</span><span class="sep">:</span><span class="num">${b}</span></div>`;
+  let plate, status;
+  if (m.live) {
+    plate = plateOf(m.homeScore ?? 0, m.awayScore ?? 0, "screen--live");
+    status = `<span class="mp-status mp-status--live"><span class="dot-live"></span>${esc(cap(L.live))}</span>`;
+  } else if (m.homeScore !== null) {
+    plate = plateOf(m.homeScore, m.awayScore, "screen--final");
+    status = `<span class="mp-status">${esc(M.finished)}</span>`;
+  } else {
+    plate = `<div class="screen"><span class="clock">${esc(fmtTime(m.date))}</span></div>`;
+    status = `<span class="mp-status">${esc(m.postponed ? M.postponed : M.notStarted)}</span>`;
+  }
+  const when = m.date ? `${fmtDay(m.date)}, ${fmtTime(m.date)}` : L.tbd;
+  const team = (name, badge) =>
+    `<div class="mp-team">${badgeHTML(badge, name)}<span class="mp-team-name">${esc(clubName(name))}</span></div>`;
+  return `<div class="mp-score">
+      ${team(m.home, m.homeBadge)}
+      <div class="mp-center">${plate}${status}<span class="mp-when">${esc(when)}</span></div>
+      ${team(m.away, m.awayBadge)}
+    </div>${d ? scorersHTML(m, d) : ""}`;
+}
+
+// Кто забил — коротко, под своей командой. Дубль одного игрока — одной строкой
+function scorersHTML(m, d) {
+  const M = t().mp;
+  const goals = d.events.filter((e) => GOAL_TYPES.includes(e.type));
+  const side = (s) => {
+    const by = new Map();
+    for (const g of goals) {
+      if (g.side !== s) continue;
+      const key = `${g.player}|${g.type === "own"}`;
+      if (!by.has(key)) by.set(key, { name: g.player, own: g.type === "own", mins: [] });
+      by.get(key).mins.push(`${g.min ?? "?"}'${g.type === "pen" ? ` (${M.penShort})` : ""}`);
+    }
+    return [...by.values()].map((x) => {
+      const ic = ballIcon(x.own ? "ic--own" : "");
+      const text = `<b>${esc(x.name || "—")}</b> ${esc(x.mins.join(", "))}${x.own ? ` (${esc(M.ownGoal)})` : ""}`;
+      return `<li>${s === "home" ? text + ic : ic + text}</li>`;
+    }).join("");
+  };
+  const total = (m.homeScore ?? 0) + (m.awayScore ?? 0);
+  // Если ключ отдал не все события, честно говорим, сколько голов известно
+  const short = m.homeScore !== null && goals.length < total
+    ? `<p class="mp-known">${esc(M.goalsKnown(goals.length, total))}</p>` : "";
+  if (!goals.length && !short) return "";
+  return `<div class="mp-scorers"><ul class="mp-sc mp-sc--home">${side("home")}</ul>` +
+         `<ul class="mp-sc mp-sc--away">${side("away")}</ul>${short}</div>`;
+}
+
+function eventWho(e) {
+  const M = t().mp;
+  let main = e.player, note = "";
+  switch (e.type) {
+    case "goal":    note = e.other ? M.assist(e.other) : ""; break;
+    case "pen":     note = M.penalty; break;
+    case "own":     note = M.ownGoal; break;
+    case "miss":    note = M.missed; break;
+    case "yellow":  note = reasonText(e.comment); break;
+    case "yellow2": note = [M.secondYellow, reasonText(e.comment)].filter(Boolean).join(", "); break;
+    case "red":     note = [M.sentOff, reasonText(e.comment)].filter(Boolean).join(", "); break;
+    case "sub":     main = e.other || e.player; note = e.other && e.player ? M.subFor(e.player) : ""; break;
+    case "var":     main = e.player || "VAR"; note = varText(e.detail); break;
+  }
+  return `<span class="tl-who"><b>${esc(main || "—")}</b>${note ? `<small>${esc(note)}</small>` : ""}</span>`;
+}
+
+function eventRowHTML(e, score) {
+  const label = t().mp.kind[e.type] || "";
+  const ic = `<span class="tl-ic" title="${esc(label)}">${eventIcon(e.type)}<span class="sr">${esc(label)}</span></span>`;
+  const who = eventWho(e);
+  const goal = GOAL_TYPES.includes(e.type);
+  return `<div class="tl-row${goal ? " tl-row--goal" : ""}">
+    <span class="tl-min"><b>${e.min === null ? "—" : esc(e.min + "'")}</b>${score ? `<span>${esc(score)}</span>` : ""}</span>
+    <div class="tl-ev tl-ev--${e.side}">${e.side === "home" ? who + ic : ic + who}</div>
+  </div>`;
+}
+
+const markHTML = (label, score) =>
+  `<div class="tl-row tl-row--mark"><span class="tl-mark">${esc(label)}${score ? `<b>${esc(score)}</b>` : ""}</span></div>`;
+
+// Ход матча: события нанизаны на нить по минутам, хозяева слева, гости справа
+function timelineHTML(m, d) {
+  const M = t().mp;
+  const cut = d.cut.events && tsdbFree() ? `<p class="hint">${esc(M.cutEvents)}</p>` : "";
+  if (!d.events.length) {
+    return (m.finished || m.live)
+      ? mpNotice(M.noEventsTitle, M.noEventsText) + cut
+      : mpNotice(M.notStarted, M.notStartedText);
+  }
+  const list = d.events.slice().sort((a, b) => (a.min ?? 999) - (b.min ?? 999) || a.i - b.i);
+  const rows = [markHTML(M.kickoff)];
+  let h = 0, a = 0, ht = false;
+  for (const e of list) {
+    if (!ht && e.min !== null && e.min > 45) { rows.push(markHTML(M.halfTime, `${h}:${a}`)); ht = true; }
+    let score = "";
+    if (GOAL_TYPES.includes(e.type)) { if (e.side === "home") h++; else a++; score = `${h}:${a}`; }
+    rows.push(eventRowHTML(e, score));
+  }
+  if (m.live) {
+    rows.push(markHTML(cap(t().live)));
+  } else if (m.finished && !cut) {
+    // Финальный свисток ставим, только когда видим матч целиком
+    if (!ht) rows.push(markHTML(M.halfTime, `${h}:${a}`));
+    rows.push(markHTML(M.fullTime, m.homeScore !== null ? `${m.homeScore}:${m.awayScore}` : ""));
+  }
+  return `<div class="tl">${rows.join("")}</div>${cut}`;
+}
+
+const STAT_ORDER = ["ball possession", "expected_goals", "total shots", "shots on goal", "shots off goal",
+  "blocked shots", "shots insidebox", "shots outsidebox", "corner kicks", "offsides", "fouls",
+  "free kicks", "yellow cards", "red cards", "goalkeeper saves", "total passes", "passes accurate",
+  "passes %", "goals_prevented"];
+
+function statsHTML(d) {
+  const M = t().mp;
+  if (!d.stats.length) return mpNotice(M.noStatsTitle, M.noStatsText);
+  const rank = (k) => { const i = STAT_ORDER.indexOf(k); return i < 0 ? 99 : i; };
+  const clamp = (w) => Math.max(0, Math.min(100, w));
+  const rows = d.stats.slice().sort((x, y) => rank(x.key) - rank(y.key)).map((s) => {
+    const sum = s.h + s.a;
+    const hw = sum > 0 ? clamp(s.h / sum * 100) : 0;
+    const aw = sum > 0 ? clamp(s.a / sum * 100) : 0;
+    const lead = s.h > s.a ? "home" : s.a > s.h ? "away" : "";
+    const val = (v, side) => `<span class="st-val${lead === side ? " st-val--lead" : ""}">${esc(v)}</span>`;
+    const bar = (w, side) => `<span class="st-bar${side === "home" ? " st-bar--home" : ""}">` +
+      `<i${lead === side ? ' class="lead"' : ""} style="width:${w.toFixed(1)}%"></i></span>`;
+    return `<div class="st-row">
+      <div class="st-head">${val(s.home, "home")}<span class="st-name">${esc(M.stat[s.key] || s.label)}</span>${val(s.away, "away")}</div>
+      <div class="st-bars" aria-hidden="true">${bar(hw, "home")}${bar(aw, "away")}</div>
+    </div>`;
+  }).join("");
+  const cut = d.cut.stats && tsdbFree() ? `<p class="hint">${esc(M.cutStats)}</p>` : "";
+  return `<div class="st">${rows}</div>${cut}`;
+}
+
+// Пять игроков из сорока — это не состав, такую вкладку не показываем
+function lineupsOk(d) {
+  if (d.cut.lineups && tsdbFree()) return false;
+  const { home, away } = d.lineups;
+  return Math.max(home.start.length, away.start.length) >= 7;
+}
+
+// Что игрок сделал в матче — значки рядом с фамилией в составе
+function playerMarks(events) {
+  const marks = new Map();
+  const add = (name, mark) => {
+    if (!name) return;
+    if (!marks.has(name)) marks.set(name, []);
+    marks.get(name).push(mark);
+  };
+  for (const e of events) {
+    if (e.type === "sub") { add(e.player, { type: "out", min: e.min }); add(e.other, { type: "in", min: e.min }); }
+    else if (e.type !== "var") add(e.player, { type: e.type, min: e.min });
+  }
+  return marks;
+}
+
+function marksHTML(list) {
+  if (!list || !list.length) return "";
+  const M = t().mp;
+  return `<span class="lu-ev">${list.map((k) => {
+    const min = k.min === null ? "" : `${k.min}'`;
+    if (k.type === "in" || k.type === "out") {
+      return `<span class="lu-sub lu-sub--${k.type}" title="${esc(M.kind.sub)} ${esc(min)}">${k.type === "in" ? "▲" : "▼"}${esc(min)}</span>`;
+    }
+    return `<span class="tl-ic" title="${esc(M.kind[k.type] || "")} ${esc(min)}">${eventIcon(k.type)}</span>`;
+  }).join("")}</span>`;
+}
+
+function playersHTML(list, marks) {
+  const M = t().mp;
+  if (!list.length) return `<p class="lu-empty">—</p>`;
+  return `<ul class="lu-list">${list.map((p) => `
+    <li class="lu-p">
+      <span class="lu-num">${esc(p.num)}</span>
+      <span class="lu-name">${esc(p.name)}${marksHTML(marks.get(p.name))}</span>
+      <span class="lu-pos" title="${esc(M.posFull[p.line] || "")}">${esc(M.pos[p.line] || "")}</span>
+    </li>`).join("")}</ul>`;
+}
+
+function lineupsHTML(m, d) {
+  const M = t().mp;
+  const marks = playerMarks(d.events);
+  const col = (s, name, badge) => `
+    <div class="lu-col">
+      <h3 class="lu-team">${badgeHTML(badge, name)}<span>${esc(clubName(name))}</span>${
+        s.formation ? `<span class="lu-form">${esc(s.formation)}</span>` : ""}</h3>
+      <p class="lu-h">${esc(M.starting)}</p>
+      ${playersHTML(s.start, marks)}
+      ${s.bench.length ? `<p class="lu-h lu-h--bench">${esc(M.bench)}</p>${playersHTML(s.bench, marks)}` : ""}
+    </div>`;
+  return `<div class="lu">${col(d.lineups.home, m.home, m.homeBadge)}${col(d.lineups.away, m.away, m.awayBadge)}</div>`;
+}
+
+function mpFootHTML(m) {
+  if (!m) return "";
+  const M = t().mp, parts = [];
+  if (m.video) {
+    parts.push(`<a class="mp-video" href="${esc(m.video)}" target="_blank" rel="noopener noreferrer">${IC_PLAY}${esc(M.video)}</a>`);
+  }
+  if (m.venue) parts.push(`<span class="mp-venue">${IC_PIN}${esc(m.venue)}</span>`);
+  return parts.length ? `<div class="mp-foot">${parts.join("")}</div>` : "";
+}
+
+let mp = null;   // открытое окно: { id, tab, match, data, error, loading }
+
+function renderMatchPanel() {
+  if (!mp) return;
+  const L = t(), M = L.mp, m = mp.match, d = mp.data;
+  const leagueName = (m && (L.league[m.leagueId] || m.leagueName)) || L.league[state.league.id];
+  const stage = m ? stageLabel(m.stage) : null;
+  const eyebrow = [leagueName, stage && stage.full].filter(Boolean).join(" · ");
+
+  let tabs = "", body;
+  if (mp.loading) {
+    body = `<div class="mp-skel">${'<div class="skel"></div>'.repeat(4)}</div>`;
+  } else if (mp.error) {
+    body = mpNotice(M.failTitle, describeErr(mp.error), true);
+  } else if (d.demo) {
+    body = mpNotice(L.demoTitle, M.demo);
+  } else if (d.unsupported) {
+    body = mpNotice(M.failTitle, M.unsupported);
+  } else {
+    const avail = ["events"];
+    if (d.stats.length) avail.push("stats");
+    if (lineupsOk(d)) avail.push("lineups");
+    if (!avail.includes(mp.tab)) mp.tab = "events";
+    if (avail.length > 1) {
+      tabs = `<div class="mp-tabs" role="tablist">${avail.map((k) =>
+        `<button role="tab" data-mtab="${k}" aria-selected="${k === mp.tab}">${esc(M.tabs[k])}</button>`).join("")}</div>`;
+    }
+    body = mp.tab === "stats" ? statsHTML(d) : mp.tab === "lineups" ? lineupsHTML(m, d) : timelineHTML(m, d);
+  }
+
+  // Фокус переживает перерисовку — иначе после фонового обновления он падает на страницу
+  const active = document.activeElement;
+  const refocus = active && active.dataset && active.dataset.mtab ? `[data-mtab="${active.dataset.mtab}"]`
+    : active && active.hasAttribute && active.hasAttribute("data-mp-close") ? "[data-mp-close]" : null;
+
+  $("#mp-content").innerHTML = `
+    <div class="mp-top">
+      <span class="mp-eyebrow">${esc(eyebrow)}</span>
+      <button class="mp-close" data-mp-close aria-label="${esc(M.close)}" title="${esc(M.close)}">${IC_X}</button>
+    </div>
+    ${m ? mpHeadHTML(m, d && d.events ? d : null) : ""}
+    ${tabs}
+    <div class="mp-body"${tabs ? ' role="tabpanel"' : ""}>${body}</div>
+    ${mpFootHTML(m)}`;
+
+  $(".mp-box").setAttribute("aria-label", m ? `${clubName(m.home)} — ${clubName(m.away)}` : M.open);
+  if (refocus) { const el = $("#mp-content").querySelector(refocus); if (el) el.focus(); }
+}
+
 /* ---------- Панель ключей ----------
    Правка файла и перезаливка на хостинг — долгий цикл, в котором легко
    ошибиться. Здесь ключ можно проверить прямо на странице за секунду. */
@@ -2812,7 +3726,7 @@ async function keysTest() {
   store.set("fdKey", fd);
   store.set("afKey", af);
   store.set("fdProxy", px);
-  cache.clear(); windowCache.clear(); afSeasonCache.clear(); afWindowTop = null;
+  cache.clear(); windowCache.clear(); afSeasonCache.clear(); afWindowTop = null; detailCache.clear();
 
   let fdLine, afLine;
 
@@ -2866,22 +3780,40 @@ async function keysTest() {
    ровно туда же, где ты был. Заодно ссылкой можно поделиться.
    Используем replaceState, чтобы не засорять историю браузера. */
 
-function writeHash() {
+function hashParts() {
   const parts = [state.lang, state.sport.id, state.league.id, state.view];
   if (state.view === "round" && state.round) parts.push(state.round);
   if (state.view === "cal" && state.calDay) parts.push(isoKey(state.calDay));
   if (state.view === "players") parts.push(state.playerKind);
+  return parts;
+}
 
-  const h = "#" + parts.join("/");
+/* Открытый матч дописывается хвостом: #ru/football/4328/results/match/2494042.
+   Номер матча проверяем по шаблону: он попадает в адрес и в селекторы. */
+const MATCH_ID = /^[\w-]{1,40}$/;
+const baseHash = () => "#" + hashParts().join("/");
+const matchHref = (id) => `${baseHash()}/match/${id}`;
+
+function writeHash() {
+  const h = state.matchId ? matchHref(state.matchId) : baseHash();
   if (location.hash !== h) {
     try { history.replaceState(null, "", h); } catch (e) { location.hash = h; }
   }
 }
 
-function applyHash() {
+function splitHash() {
   const raw = (location.hash || "").replace(/^#/, "").trim();
-  if (!raw) return;
-  const [lang, sportId, leagueId, view, extra] = raw.split("/");
+  const parts = raw ? raw.split("/") : [];
+  const i = parts.indexOf("match");
+  const id = i >= 0 ? parts[i + 1] || "" : "";
+  return { base: i >= 0 ? parts.slice(0, i) : parts, matchId: MATCH_ID.test(id) ? id : null };
+}
+
+function applyHash() {
+  const { base, matchId } = splitHash();
+  state.matchId = matchId;
+  if (!base.length) return;
+  const [lang, sportId, leagueId, view, extra] = base;
 
   if (I18N[lang]) state.lang = lang;
 
@@ -3148,6 +4080,84 @@ function setView(id) {
   load();
 }
 
+/* ---------- Окно матча: открыть, загрузить, закрыть ----------
+   Карточка матча — обычная ссылка на …/match/<id>. Переход по ней
+   добавляет шаг в историю, поэтому «назад» в браузере и на телефоне
+   закрывает окно. Открытое по ссылке извне окно закрывается без
+   шага назад — иначе посетитель ушёл бы с сайта. */
+
+let mpToken = 0;
+let mpFromList = false;     // открыто кликом по карточке: «закрыть» = шаг назад
+let mpReturn = null;        // куда вернуть фокус после закрытия
+
+function openMatchPanel(id) {
+  const box = $("#mp");
+  if (mp && mp.id === id && !box.hidden) { renderMatchPanel(); return; }
+  if (box.hidden) {
+    mpReturn = document.activeElement;
+    box.hidden = false;
+    document.body.classList.add("mp-open");
+  } else {
+    // Матч сменили прямо в адресе, а не кликом: шаг назад вернул бы прошлый матч
+    mpFromList = false;
+  }
+  mp = { id, tab: "events", match: matchIndex.get(id) || null, data: null, error: null, loading: true };
+  renderMatchPanel();
+  $(".mp-box").scrollTop = 0;
+  $(".mp-box").focus({ preventScroll: true });
+  fetchMatchPanel(false);
+}
+
+async function fetchMatchPanel(force) {
+  if (!mp) return;
+  const token = ++mpToken, id = mp.id;
+  const src = mp.match ? mp.match.src
+    : id.startsWith("demo-") ? "demo" : useApiFootball(state.sport) ? "af" : "tsdb";
+  if (src !== "tsdb") {
+    mp.data = src === "demo" ? { demo: true } : { unsupported: true };
+    mp.loading = false;
+    renderMatchPanel();
+    return;
+  }
+  try {
+    const data = await matchDetails(id, mp.match, force);
+    if (token !== mpToken || !mp || mp.id !== id) return;
+    mp.data = data;
+    mp.match = data.match;
+    mp.error = null;
+  } catch (e) {
+    if (token !== mpToken || !mp || mp.id !== id) return;
+    if (!mp.data) mp.error = e;           // при фоновом обновлении старое не стираем
+  }
+  mp.loading = false;
+  renderMatchPanel();
+}
+
+function closeMatchPanel(fromHash) {
+  const box = $("#mp");
+  if (box.hidden) return;
+  if (!fromHash && mpFromList) {
+    mpFromList = false;
+    history.back();                       // окно спрячет обработчик hashchange
+    return;
+  }
+  const id = mp && mp.id;
+  mp = null; mpToken++; mpFromList = false;
+  box.hidden = true;
+  document.body.classList.remove("mp-open");
+  if (!fromHash) { state.matchId = null; writeHash(); }
+  const card = id && document.querySelector(`a.match[data-mid="${id}"]`);
+  const back = card || (mpReturn && document.contains(mpReturn) ? mpReturn : null);
+  if (back && back.focus) back.focus({ preventScroll: true });
+}
+
+// Открыть или закрыть окно по тому, что сейчас записано в адресе
+function syncMatchPanel() {
+  if (state.matchId && state.sport.kind !== "match") { state.matchId = null; writeHash(); }
+  if (state.matchId) openMatchPanel(state.matchId);
+  else closeMatchPanel(true);
+}
+
 $("#keysbtn").addEventListener("click", () => keysOpen(true));
 $("#k-close").addEventListener("click", () => keysOpen(false));
 $("#k-test").addEventListener("click", keysTest);
@@ -3157,11 +4167,38 @@ $("#k-forget").addEventListener("click", () => {
   CONFIG.provider = "thesportsdb";
   $("#k-fd").value = $("#k-af").value = $("#k-px").value = "";
   $("#k-result").innerHTML = "";
-  cache.clear(); windowCache.clear(); afSeasonCache.clear(); afWindowTop = null;
+  cache.clear(); windowCache.clear(); afSeasonCache.clear(); afWindowTop = null; detailCache.clear();
   load();
 });
 $("#keys").addEventListener("click", (e) => { if (e.target.id === "keys") keysOpen(false); });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") keysOpen(false); });
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!$("#mp").hidden) closeMatchPanel(); else keysOpen(false);
+});
+
+// Окно матча: крестик, клик мимо окна, вкладки, повтор после ошибки
+$("#mp").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget || e.target.closest("[data-mp-close]")) { closeMatchPanel(); return; }
+  const tab = e.target.closest("[data-mtab]");
+  if (tab && mp) { mp.tab = tab.dataset.mtab; renderMatchPanel(); return; }
+  if (e.target.closest("[data-mp-retry]") && mp) {
+    mp.loading = true; mp.error = null;
+    renderMatchPanel();
+    fetchMatchPanel(true);
+  }
+});
+
+// Tab не уводит фокус из открытого окна на страницу под ним
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab" || $("#mp").hidden) return;
+  const box = $(".mp-box");
+  const items = [...box.querySelectorAll("button, a[href]")].filter((el) => el.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && (document.activeElement === first || document.activeElement === box)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 
 $("#langsw").addEventListener("click", (e) => {
   const b = e.target.closest("[data-lang]"); if (b) setLang(b.dataset.lang);
@@ -3176,6 +4213,13 @@ $("#viewtabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view);
 });
 $("#content").addEventListener("click", (e) => {
+  // Карточка матча — ссылка: окно откроет смена адреса. Здесь только
+  // помечаем, что открыли из списка. С Ctrl/Cmd ссылка уходит в новую вкладку
+  if (e.target.closest("a.match")) {
+    if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) mpFromList = true;
+    return;
+  }
+
   if (e.target.closest("[data-retry]")) { cache.clear(); load(); return; }
 
   const pk = e.target.closest("[data-pk]");
@@ -3223,16 +4267,31 @@ $("#refresh").addEventListener("click", async (e) => {
 });
 
 setInterval(() => {
-  if (!document.hidden && state.view !== "table") { cache.clear(); windowCache.clear(); load(); }
+  if (document.hidden) return;
+  if (state.view !== "table") { cache.clear(); windowCache.clear(); load(); }
+  // Открытый матч, который идёт или вот-вот начнётся, обновляем тоже
+  const m = mp && mp.match;
+  if (m && !m.finished && Math.abs(m.ts - Date.now()) < 4 * 3_600_000) fetchMatchPanel(true);
 }, 120_000);
 
 /* Смена адреса вручную, переход по ссылке или кнопка «назад».
    Наш writeHash работает через replaceState и это событие не вызывает,
-   так что зациклиться здесь нельзя. */
-window.addEventListener("hashchange", () => { applyHash(); load(); });
+   так что зациклиться здесь нельзя. Если поменялся только матч в хвосте
+   адреса, список не перезагружаем — открываем или закрываем окно. */
+window.addEventListener("hashchange", () => {
+  const { base, matchId } = splitHash();
+  if (base.join("/") === hashParts().join("/")) {
+    state.matchId = matchId;
+  } else {
+    applyHash();
+    load();
+  }
+  syncMatchPanel();
+});
 
 applyHash();
 load();
+syncMatchPanel();
 
 </script>
 </body>
